@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In-House Insight - AHRQ Presentation</title>
+    <style>
+        :root {
+            --primary: #003366; /* Deep Navy (Professional/Gov) */
+            --accent: #0077cc; /* Brighter Blue for highlights */
+            --text: #333333;
+            --bg: #ffffff;
+            --slide-bg: #f4f4f9;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            color: var(--text);
+        }
+
+        /* Slide Container */
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Individual Slide */
+        .slide {
+            display: none; /* Hidden by default */
+            width: 90%;
+            height: 85%;
+            background-color: var(--bg);
+            padding: 3rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            position: relative;
+            flex-direction: column;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--primary);
+            font-size: 3.5rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--accent);
+            padding-bottom: 1rem;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-top: 0;
+        }
+
+        h3 {
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        p, li {
+            font-size: 1.6rem;
+            line-height: 1.6;
+            color: #444;
+            margin-bottom: 1rem;
+        }
+
+        ul {
+            margin-left: 2rem;
+        }
+
+        /* Custom Highlight Box */
+        .highlight-box {
+            background-color: var(--slide-bg);
+            border-left: 6px solid var(--accent);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            text-align: left;
+            font-size: 1.3rem;
+        }
+        th {
+            background-color: var(--primary);
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* Controls */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 40px;
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+        
+        .btn {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 20px;
+            left: 40px;
+            color: #888;
+            font-size: 1.2rem;
+        }
+
+        /* Footer */
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: var(--primary);
+            font-size: 1rem;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Utility */
+        .text-center { text-align: center; }
+        .flex-row { display: flex; gap: 2rem; }
+        .flex-col { flex: 1; }
+        .red-text { color: #cc0000; font-weight: bold; }
+        .green-text { color: #008800; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div class="slide-container" id="presentation">
+
+        <div class="slide active">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                <h1 style="border:none;">In-House Insight</h1>
+                <h2 style="font-weight: normal; color: var(--accent);">Secure, Agentic Analytics for Healthcare Data</h2>
+                <div style="margin-top: 3rem; font-size: 1.5rem;">
+                    <p><strong>Prepared for:</strong><br>Agency for Healthcare Research and Quality (AHRQ)</p>
+                    <p><em>U.S. Department of Health and Human Services</em></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2>The Challenge: Privacy vs. Intelligence</h2>
+            <p>Healthcare organizations typically face a blocked path to modern AI analytics:</p>
+            <div class="flex-row" style="margin-top: 2rem;">
+                <div class="flex-col highlight-box">
+                    <h3>❌ The "Black Box" Risk</h3>
+                    <p>Most AI agents (URL-based) require uploading data to external servers.</p>
+                    <p class="red-text">Result: HIPAA compliance violation risks and loss of data sovereignty.</p>
+                </div>
+                <div class="flex-col highlight-box">
+                    <h3>❌ The "Silo" Effect</h3>
+                    <p>To stay secure, data remains trapped in local SQL databases or CSVs, disconnected from AI capabilities.</p>
+                    <p class="red-text">Result: Slower, manual analysis and delayed insights.</p>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 2rem; font-weight: bold;">In-House Insight bridges this gap without moving the data.</p>
+        </div>
+
+        <div class="slide">
+            <h2>The Solution: Metadata-Only Architecture</h2>
+            <p>We decouple the <strong>Intelligence</strong> (AI) from the <strong>Execution</strong> (Data).</p>
+            
+            <div style="display: flex; align-items: center; justify-content: center; margin: 2rem 0; gap: 2rem;">
+                <div style="text-align: center; padding: 20px; background: #eee; border-radius: 8px;">
+                    <strong>Step 1</strong><br>Your Local Data<br>(Secure)
+                </div>
+                <div style="font-size: 2rem;">→</div>
+                <div style="text-align: center; padding: 20px; border: 2px dashed var(--accent); border-radius: 8px;">
+                    <strong>Step 2: Metadata Only</strong><br>AI receives only Schema<br><em>(Column names, types)</em>
+                </div>
+                <div style="font-size: 2rem;">→</div>
+                <div style="text-align: center; padding: 20px; background: #eef; border-radius: 8px;">
+                    <strong>Step 3: Code Generation</strong><br>AI returns executable<br>Python/SQL
+                </div>
+                <div style="font-size: 2rem;">→</div>
+                <div style="text-align: center; padding: 20px; background: #dfd; border-radius: 8px; border: 2px solid green;">
+                    <strong>Step 4: Local Execution</strong><br>Code runs on YOUR machine<br>Data never leaves
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <strong>Key Takeaway:</strong> The AI writes the recipe, but your kitchen cooks the meal. The ingredients (Patient Data/PHI) never leave the kitchen.
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2>Feature: Progressive Independence</h2>
+            <p>Unlike standard chat-bots, In-House Insight builds organizational memory.</p>
+            
+            <ul>
+                <li><strong>The Problem with Chat AI:</strong> Every session is a blank slate. You pay to "re-think" the same question tomorrow.</li>
+                <li><strong>The In-House Solution:</strong>
+                    <ul>
+                        <li>We save successful, vetted code into an <strong>Analysis Library</strong>.</li>
+                        <li><strong>"Progressive Independence":</strong> As your library grows, you rely <em>less</em> on the AI model and more on your own validated code repository.</li>
+                        <li>Allows for offline execution of complex analytics.</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <div class="slide">
+            <h2>Feature: Live Monitoring</h2>
+            <p>Transforming static analysis into real-time operational intelligence.</p>
+            
+            <div class="flex-row">
+                <div class="flex-col">
+                    <h3>How it works</h3>
+                    <ol>
+                        <li>Select a query from your Library (e.g., "Hospital Bed Occupancy Rate").</li>
+                        <li>Pin it to the <strong>Live Monitor</strong>.</li>
+                        <li>Set a schedule (e.g., Every 5 minutes).</li>
+                    </ol>
+                </div>
+                <div class="flex-col highlight-box">
+                    <h3 class="green-text">The Benefit: Zero LLM Cost</h3>
+                    <p>Because the system re-runs the <em>saved local code</em>, no API calls are made to the AI.</p>
+                    <p>You get a real-time, auto-updating dashboard running entirely offline on your local infrastructure.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2>Contrast: Vs. URL-Based Agents</h2>
+            <p><em>(e.g., ChatGPT Advanced Analysis, Julius AI, Cloud SaaS)</em></p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>In-House Insight</th>
+                        <th>URL-Based Tools</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Data Privacy</strong></td>
+                        <td><span class="green-text">100% Local Execution.</span> Only metadata leaves.</td>
+                        <td><span class="red-text">High Risk.</span> Full datasets uploaded to vendor cloud.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Transparency</strong></td>
+                        <td><strong>Audit-Ready.</strong> You see and own the executable code.</td>
+                        <td><strong>Black Box.</strong> Hidden processing in the cloud.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Asset Creation</strong></td>
+                        <td>Builds a permanent <strong>Analysis Library</strong>.</td>
+                        <td>Ephemeral sessions; no lasting code asset.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="slide">
+            <h2>Contrast: Vs. PowerBI</h2>
+            <p>PowerBI is for <em>Visualizing</em> knowns. In-House Insight is for <em>Agentic Discovery</em>.</p>
+            
+            <div class="flex-row">
+                <div class="flex-col">
+                    <h3>PowerBI</h3>
+                    <ul>
+                        <li><strong>Static:</strong> Great for dashboards you defined months ago.</li>
+                        <li><strong>Heavy Lift:</strong> New questions require modeling, DAX coding, and BI specialists.</li>
+                        <li><strong>Cloud Bias:</strong> "Copilot" features often force data into Azure/Fabric.</li>
+                    </ul>
+                </div>
+                <div class="flex-col" style="border-left: 1px solid #ccc; padding-left: 2rem;">
+                    <h3>In-House Insight</h3>
+                    <ul>
+                        <li><strong>Agentic:</strong> "Show me the trend of X vs Y" -> Done in seconds.</li>
+                        <li><strong>Agile:</strong> No data modeling required. Just ask.</li>
+                        <li><strong>Agnostic:</strong> Sits on top of your existing DBs/CSVs without moving them.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box" style="text-align: center;">
+                <em>"PowerBI shows you what you already decided to measure. In-House Insight answers what you are asking today."</em>
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2>Why This Matters for AHRQ</h2>
+            <div class="flex-row">
+                <div class="flex-col">
+                    <h3>1. Data Sovereignty</h3>
+                    <p>Your research and patient data never cross organizational boundaries. Full HIPAA compliance alignment.</p>
+                </div>
+                <div class="flex-col">
+                    <h3>2. Auditability</h3>
+                    <p>Evidence-based research requires traceability. We provide the raw code for every insight, ensuring reproducibility.</p>
+                </div>
+                <div class="flex-col">
+                    <h3>3. Cost & Efficiency</h3>
+                    <p>Develop a library of internal tools that run for free (Zero LLM cost) after creation.</p>
+                </div>
+            </div>
+            <br><br>
+            <h1 style="text-align: center; border: none; font-size: 2.5rem;">novastorms.ai</h1>
+        </div>
+
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="prevSlide()">❮ Previous</button>
+        <button class="btn" onclick="nextSlide()">Next ❯</button>
+    </div>
+
+    <div class="slide-number" id="slideNum">1 / 8</div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const slideNumDisplay = document.getElementById('slideNum');
+
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.remove('active');
+                if (i === index) {
+                    slide.classList.add('active');
+                }
+            });
+            slideNumDisplay.textContent = `${index + 1} / ${slides.length}`;
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowRight' || event.key === ' ') {
+                nextSlide();
+            } else if (event.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+</html>

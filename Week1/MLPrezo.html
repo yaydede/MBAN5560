@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Learning & AI - MBAN 5560</title>
+    <style>
+        :root {
+            --primary: #1a365d;
+            --accent: #3182ce;
+            --accent-light: #63b3ed;
+            --text: #2d3748;
+            --bg: #ffffff;
+            --slide-bg: #f7fafc;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            color: var(--text);
+        }
+
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .slide {
+            display: none;
+            width: 92%;
+            height: 88%;
+            background: var(--bg);
+            padding: 2.5rem 3rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+            border-radius: 12px;
+            flex-direction: column;
+            animation: fadeIn 0.3s ease-out;
+            overflow: hidden;
+        }
+
+        .slide.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.8rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 4px solid var(--accent);
+            padding-bottom: 0.8rem;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin-bottom: 0.8rem;
+        }
+
+        p, li {
+            font-size: 1.35rem;
+            line-height: 1.7;
+            color: #4a5568;
+            margin-bottom: 0.8rem;
+        }
+
+        ul { margin-left: 1.5rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #ebf8ff 0%, #f0fff4 100%);
+            border-left: 5px solid var(--accent);
+            padding: 1.2rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .flex-row { display: flex; gap: 2rem; flex: 1; }
+        .flex-col { flex: 1; }
+
+        .icon-box {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--slide-bg);
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .icon-box .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+        .controls {
+            position: fixed;
+            bottom: 25px;
+            right: 40px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 1rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .slide-number {
+            position: fixed;
+            bottom: 30px;
+            left: 40px;
+            color: rgba(255,255,255,0.7);
+            font-size: 1.1rem;
+        }
+
+        .title-slide {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 50%, #2b6cb0 100%);
+        }
+
+        .title-slide h1 {
+            color: white;
+            font-size: 3.5rem;
+            border: none;
+            margin-bottom: 1rem;
+        }
+
+        .title-slide h2 {
+            color: var(--accent-light);
+            font-weight: normal;
+            font-size: 1.8rem;
+        }
+
+        .title-slide p {
+            color: rgba(255,255,255,0.8);
+            font-size: 1.3rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin: 0.2rem;
+        }
+
+        .stat-box {
+            background: var(--primary);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-box .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--accent-light);
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container" id="presentation">
+
+        <!-- Slide 1: Title -->
+        <div class="slide title-slide active">
+            <h1>🤖 Machine Learning & AI</h1>
+            <h2>MBAN 5560 - Saint Mary's University</h2>
+            <p style="margin-top: 2rem;"><strong>Yigit Aydede</strong></p>
+            <p>Winter 2026</p>
+            <p style="margin-top: 3rem; font-size: 1.1rem;">Press → or click Next to begin</p>
+        </div>
+
+        <!-- Slide 2: What is ML -->
+        <div class="slide">
+            <h1>What is Machine Learning?</h1>
+            <div class="flex-row">
+                <div class="flex-col">
+                    <div class="highlight-box">
+                        <h3>📚 Definition</h3>
+                        <p>Machine Learning is a branch of AI that enables computers to <strong>learn patterns from data</strong> and make predictions or decisions without being explicitly programmed for each task.</p>
+                    </div>
+                    <p style="margin-top: 1rem;">The key insight: instead of writing rules, we <strong>show examples</strong> and let the algorithm discover the rules.</p>
+                    <ul>
+                        <li>Traditional Programming: Data + Rules → Output</li>
+                        <li>Machine Learning: Data + Output → Rules</li>
+                    </ul>
+                </div>
+                <div class="flex-col">
+                    <div class="icon-box">
+                        <div class="icon">📊</div>
+                        <h3>Data</h3>
+                        <p>Examples to learn from</p>
+                    </div>
+                    <div style="text-align: center; font-size: 2rem; margin: 0.5rem;">↓</div>
+                    <div class="icon-box">
+                        <div class="icon">⚙️</div>
+                        <h3>Algorithm</h3>
+                        <p>Finds patterns</p>
+                    </div>
+                    <div style="text-align: center; font-size: 2rem; margin: 0.5rem;">↓</div>
+                    <div class="icon-box">
+                        <div class="icon">🎯</div>
+                        <h3>Model</h3>
+                        <p>Makes predictions</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: AI/ML Landscape -->
+        <div class="slide">
+            <h1>The AI Revolution (2020-2026)</h1>
+            <p>We're living through the most significant AI advancement in history:</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col">
+                    <div class="stat-box">
+                        <div class="number">175B+</div>
+                        <p>Parameters in GPT-3</p>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div class="stat-box">
+                        <div class="number">100M</div>
+                        <p>ChatGPT users in 2 months</p>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div class="stat-box">
+                        <div class="number">$200B+</div>
+                        <p>AI market by 2026</p>
+                    </div>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 1rem;">
+                <h3>🚀 Key Breakthroughs</h3>
+                <p>
+                    <span class="badge">Transformers</span>
+                    <span class="badge">Large Language Models</span>
+                    <span class="badge">Generative AI</span>
+                    <span class="badge">Foundation Models</span>
+                    <span class="badge">Multimodal AI</span>
+                    <span class="badge">AI Agents</span>
+                </p>
+            </div>
+            <p style="margin-top: 0.5rem;"><strong>Foundation Models:</strong> Pre-trained on massive data, then fine-tuned for specific tasks (GPT, Claude, Llama, BERT)</p>
+        </div>
+
+        <!-- Slide 4: What ML Does -->
+        <div class="slide">
+            <h1>What Does ML Actually Do?</h1>
+            <div class="flex-row">
+                <div class="flex-col">
+                    <div class="highlight-box" style="background: linear-gradient(135deg, #c6f6d5 0%, #f0fff4 100%); border-color: #38a169;">
+                        <h3>✅ ML is Great For</h3>
+                        <ul>
+                            <li><strong>Prediction</strong> - What will happen?</li>
+                            <li><strong>Pattern Recognition</strong> - What's in this image?</li>
+                            <li><strong>Classification</strong> - Is this spam?</li>
+                            <li><strong>Recommendation</strong> - What might you like?</li>
+                            <li><strong>Anomaly Detection</strong> - Is this fraudulent?</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div class="highlight-box" style="background: linear-gradient(135deg, #fed7d7 0%, #fff5f5 100%); border-color: #e53e3e;">
+                        <h3>⚠️ ML Doesn't Give You</h3>
+                        <ul>
+                            <li><strong>Causation</strong> - Why did it happen?</li>
+                            <li><strong>Understanding</strong> - The "why" behind predictions</li>
+                        </ul>
+                        <p style="margin-top: 1rem; font-size: 1.1rem;"><em>Example: Ice cream sales predict crime rates (correlation), but don't cause crime!</em></p>
+                    </div>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 1rem;">
+                <p><strong>🎯 Core Task:</strong> Find a function f(X) that accurately predicts Y using features X</p>
+            </div>
+        </div>
+
+        <!-- Slide 5: Three Pillars -->
+        <div class="slide">
+            <h1>Three Pillars of Machine Learning</h1>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col icon-box" style="background: linear-gradient(180deg, #ebf8ff 0%, #fff 100%);">
+                    <div class="icon">🏷️</div>
+                    <h3>Supervised Learning</h3>
+                    <p style="font-size: 1.1rem;">Learn from <strong>labeled</strong> examples</p>
+                    <p style="font-size: 1rem; color: #718096;">Input → Known Output</p>
+                    <div style="margin-top: 1rem;">
+                        <span class="badge">Regression</span>
+                        <span class="badge">Classification</span>
+                    </div>
+                    <p style="font-size: 0.95rem; margin-top: 0.8rem;"><em>Ex: Predicting house prices, spam detection</em></p>
+                </div>
+                <div class="flex-col icon-box" style="background: linear-gradient(180deg, #f0fff4 0%, #fff 100%);">
+                    <div class="icon">🔍</div>
+                    <h3>Unsupervised Learning</h3>
+                    <p style="font-size: 1.1rem;">Find <strong>hidden patterns</strong></p>
+                    <p style="font-size: 1rem; color: #718096;">Input → Discover Structure</p>
+                    <div style="margin-top: 1rem;">
+                        <span class="badge">Clustering</span>
+                        <span class="badge">Dimensionality</span>
+                    </div>
+                    <p style="font-size: 0.95rem; margin-top: 0.8rem;"><em>Ex: Customer segmentation, anomaly detection</em></p>
+                </div>
+                <div class="flex-col icon-box" style="background: linear-gradient(180deg, #faf5ff 0%, #fff 100%);">
+                    <div class="icon">🎮</div>
+                    <h3>Reinforcement Learning</h3>
+                    <p style="font-size: 1.1rem;">Learn by <strong>trial and error</strong></p>
+                    <p style="font-size: 1rem; color: #718096;">Action → Reward/Penalty</p>
+                    <div style="margin-top: 1rem;">
+                        <span class="badge">Agents</span>
+                        <span class="badge">Rewards</span>
+                    </div>
+                    <p style="font-size: 0.95rem; margin-top: 0.8rem;"><em>Ex: Game AI, robotics, LLM alignment</em></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Big Data -->
+        <div class="slide">
+            <h1>The Data Revolution: 5 V's</h1>
+            <p>Why ML is thriving now: <strong>unprecedented data availability + computing power</strong></p>
+            <div class="flex-row" style="margin-top: 1.5rem;">
+                <div class="flex-col icon-box">
+                    <div class="icon">📦</div>
+                    <h3>Volume</h3>
+                    <p style="font-size: 1rem;">Massive amounts of data generated daily</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">⚡</div>
+                    <h3>Velocity</h3>
+                    <p style="font-size: 1rem;">Real-time data streams</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">🎨</div>
+                    <h3>Variety</h3>
+                    <p style="font-size: 1rem;">Text, images, video, sensors</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">✓</div>
+                    <h3>Veracity</h3>
+                    <p style="font-size: 1rem;">Data quality & trustworthiness</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">💎</div>
+                    <h3>Value</h3>
+                    <p style="font-size: 1rem;">Extracting insights</p>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 1.5rem;">
+                <p><strong>Key Enablers:</strong> Cloud computing (AWS, GCP, Azure), GPUs, TPUs, distributed systems, and open-source frameworks have made ML accessible to everyone.</p>
+            </div>
+        </div>
+
+        <!-- Slide 7: How Machines Learn -->
+        <div class="slide">
+            <h1>How Machines Learn: The Training Loop</h1>
+            <div class="flex-row">
+                <div class="flex-col">
+                    <div style="background: var(--slide-bg); padding: 1.5rem; border-radius: 12px; border: 2px solid var(--accent);">
+                        <h3>🔄 The Learning Process</h3>
+                        <ol style="margin-left: 1.2rem;">
+                            <li><strong>Initialize</strong> model with random parameters</li>
+                            <li><strong>Predict</strong> outcomes on training data</li>
+                            <li><strong>Calculate</strong> prediction errors (loss)</li>
+                            <li><strong>Adjust</strong> parameters to reduce error</li>
+                            <li><strong>Repeat</strong> until error stops improving</li>
+                        </ol>
+                    </div>
+                    <div class="highlight-box" style="margin-top: 1rem;">
+                        <p><strong>Hyperparameters:</strong> Settings that control the learning process (learning rate, iterations, complexity)</p>
+                    </div>
+                </div>
+                <div class="flex-col" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                    <div class="icon-box" style="width: 100%;">
+                        <div class="icon">📊</div>
+                        <p>Data In</p>
+                    </div>
+                    <div style="font-size: 2rem;">↓</div>
+                    <div class="icon-box" style="width: 100%; background: var(--accent); color: white;">
+                        <div class="icon">🧠</div>
+                        <p style="color: white;"><strong>Model</strong></p>
+                    </div>
+                    <div style="font-size: 2rem;">↓</div>
+                    <div class="icon-box" style="width: 100%;">
+                        <div class="icon">📈</div>
+                        <p>Prediction</p>
+                    </div>
+                    <div style="font-size: 1.5rem; margin-top: 0.5rem;">🔄 Feedback Loop</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Train/Test Split -->
+        <div class="slide">
+            <h1>Training & Validation Strategy</h1>
+            <p>Why we split data: to <strong>estimate how well our model generalizes</strong> to unseen data</p>
+            
+            <!-- Simple Split -->
+            <div style="margin-top: 1rem;">
+                <p style="margin-bottom: 0.3rem; font-size: 1.1rem;"><strong>Simple Split:</strong></p>
+                <div style="display: flex; border-radius: 8px; overflow: hidden; height: 50px;">
+                    <div style="width: 70%; background: #3182ce; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">Train (70%)</div>
+                    <div style="width: 30%; background: #48bb78; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">Test (30%)</div>
+                </div>
+            </div>
+
+            <!-- With Validation - Two Stage -->
+            <div style="margin-top: 1.5rem;">
+                <p style="margin-bottom: 0.3rem; font-size: 1.1rem;"><strong>With Validation (Two-Stage Process):</strong></p>
+                <p style="font-size: 1rem; color: #718096; margin-bottom: 0.5rem;">Step 1: Hold out Test set first</p>
+                <div style="display: flex; border-radius: 8px; overflow: hidden; height: 50px;">
+                    <div style="width: 80%; background: #3182ce; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">Train + Validation (80%)</div>
+                    <div style="width: 20%; background: #48bb78; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">Test (20%)</div>
+                </div>
+                <p style="font-size: 1rem; color: #718096; margin: 0.5rem 0;">Step 2: Split the 80% via Cross-Validation</p>
+                <div style="display: flex; border-radius: 8px; overflow: hidden; height: 50px; width: 80%;">
+                    <div style="width: 75%; background: #3182ce; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">Train (~75% of 80%)</div>
+                    <div style="width: 25%; background: #ed8936; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">Val (~25%)</div>
+                </div>
+                <p style="font-size: 0.9rem; color: #718096; font-style: italic; margin-top: 0.3rem;">↻ K-Fold CV rotates which portion is validation</p>
+            </div>
+
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col highlight-box" style="border-color: #3182ce; padding: 0.8rem;">
+                    <h3 style="font-size: 1.2rem;">🏋️ Training</h3>
+                    <p style="font-size: 1rem;">Model learns patterns</p>
+                </div>
+                <div class="flex-col highlight-box" style="border-color: #ed8936; padding: 0.8rem;">
+                    <h3 style="font-size: 1.2rem;">🎯 Validation</h3>
+                    <p style="font-size: 1rem;">Tune hyperparameters</p>
+                </div>
+                <div class="flex-col highlight-box" style="border-color: #48bb78; padding: 0.8rem;">
+                    <h3 style="font-size: 1.2rem;">🧪 Test</h3>
+                    <p style="font-size: 1rem;">Final evaluation (untouched!)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: Overfitting -->
+        <div class="slide">
+            <h1>The Overfitting Problem</h1>
+            <p>The central challenge in ML: finding the <strong>sweet spot</strong> between underfitting and overfitting</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col icon-box" style="border-color: #e53e3e;">
+                    <div class="icon">📉</div>
+                    <h3 style="color: #e53e3e;">Underfitting</h3>
+                    <p style="font-size: 1rem;">Model too simple</p>
+                    <p style="font-size: 0.9rem;">High bias, misses patterns</p>
+                    <p style="font-size: 0.9rem;"><em>"Can't even fit training data"</em></p>
+                </div>
+                <div class="flex-col icon-box" style="border-color: #38a169; background: linear-gradient(180deg, #f0fff4 0%, #fff 100%);">
+                    <div class="icon">✅</div>
+                    <h3 style="color: #38a169;">Just Right</h3>
+                    <p style="font-size: 1rem;">Optimal complexity</p>
+                    <p style="font-size: 0.9rem;">Good generalization</p>
+                    <p style="font-size: 0.9rem;"><em>"Works on new data!"</em></p>
+                </div>
+                <div class="flex-col icon-box" style="border-color: #e53e3e;">
+                    <div class="icon">📈</div>
+                    <h3 style="color: #e53e3e;">Overfitting</h3>
+                    <p style="font-size: 1rem;">Model too complex</p>
+                    <p style="font-size: 0.9rem;">High variance, memorizes noise</p>
+                    <p style="font-size: 0.9rem;"><em>"Perfect on training, fails on test"</em></p>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 1rem;">
+                <h3>⚖️ Bias-Variance Tradeoff</h3>
+                <p><strong>Bias:</strong> Error from wrong assumptions (underfitting) | <strong>Variance:</strong> Sensitivity to training data (overfitting)</p>
+            </div>
+        </div>
+
+        <!-- Slide 10: Interpretability -->
+        <div class="slide">
+            <h1>Interpretability vs. Accuracy</h1>
+            <p>A fundamental tradeoff in ML: <strong>can we trust what we can't explain?</strong></p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col">
+                    <div style="background: linear-gradient(90deg, #c6f6d5 0%, #fed7d7 100%); padding: 0.8rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                        <strong>Interpretability ←————→ Accuracy</strong>
+                    </div>
+                    <div class="flex-row" style="gap: 0.5rem;">
+                        <div class="icon-box" style="flex: 1; padding: 0.8rem;">
+                            <p style="font-size: 0.9rem; margin: 0;"><strong>Linear Reg</strong></p>
+                            <p style="font-size: 0.8rem; margin: 0; color: #38a169;">Very interpretable</p>
+                        </div>
+                        <div class="icon-box" style="flex: 1; padding: 0.8rem;">
+                            <p style="font-size: 0.9rem; margin: 0;"><strong>Decision Trees</strong></p>
+                            <p style="font-size: 0.8rem; margin: 0; color: #38a169;">Interpretable</p>
+                        </div>
+                        <div class="icon-box" style="flex: 1; padding: 0.8rem;">
+                            <p style="font-size: 0.9rem; margin: 0;"><strong>Random Forest</strong></p>
+                            <p style="font-size: 0.8rem; margin: 0; color: #d69e2e;">Moderate</p>
+                        </div>
+                        <div class="icon-box" style="flex: 1; padding: 0.8rem;">
+                            <p style="font-size: 0.9rem; margin: 0;"><strong>Neural Nets</strong></p>
+                            <p style="font-size: 0.8rem; margin: 0; color: #e53e3e;">Black box</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col highlight-box">
+                    <h3>🔍 Explainable AI (XAI)</h3>
+                    <ul style="font-size: 1rem;">
+                        <li>SHAP values</li>
+                        <li>LIME explanations</li>
+                        <li>Feature importance</li>
+                        <li>Attention visualization</li>
+                    </ul>
+                </div>
+                <div class="flex-col highlight-box">
+                    <h3>⚠️ When Interpretability Matters</h3>
+                    <ul style="font-size: 1rem;">
+                        <li>Healthcare decisions</li>
+                        <li>Financial lending</li>
+                        <li>Legal/regulatory requirements</li>
+                        <li>High-stakes predictions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: ML Engineering -->
+        <div class="slide">
+            <h1>ML Engineering & MLOps</h1>
+            <p>Building models is just the beginning. <strong>ML Engineering</strong> is about making them work in the real world.</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col">
+                    <div class="highlight-box" style="border-color: #805ad5;">
+                        <h3>🔬 Data Scientist</h3>
+                        <ul style="font-size: 1rem;">
+                            <li>Explores data, builds models</li>
+                            <li>Focus: accuracy, insights</li>
+                            <li>Works in notebooks</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div class="highlight-box" style="border-color: #dd6b20;">
+                        <h3>⚙️ ML Engineer</h3>
+                        <ul style="font-size: 1rem;">
+                            <li>Deploys & scales models</li>
+                            <li>Focus: reliability, speed</li>
+                            <li>Works in production systems</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="background: var(--slide-bg); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                <h3>🔄 MLOps Lifecycle</h3>
+                <div style="display: flex; justify-content: space-between; text-align: center; margin-top: 0.5rem;">
+                    <div class="icon-box" style="flex: 1; margin: 0 0.3rem; padding: 0.8rem;"><strong>Data</strong><br><span style="font-size: 0.9rem;">Collection & Prep</span></div>
+                    <div style="align-self: center;">→</div>
+                    <div class="icon-box" style="flex: 1; margin: 0 0.3rem; padding: 0.8rem;"><strong>Train</strong><br><span style="font-size: 0.9rem;">Experiment & Tune</span></div>
+                    <div style="align-self: center;">→</div>
+                    <div class="icon-box" style="flex: 1; margin: 0 0.3rem; padding: 0.8rem;"><strong>Deploy</strong><br><span style="font-size: 0.9rem;">API & Serving</span></div>
+                    <div style="align-self: center;">→</div>
+                    <div class="icon-box" style="flex: 1; margin: 0 0.3rem; padding: 0.8rem;"><strong>Monitor</strong><br><span style="font-size: 0.9rem;">Drift & Performance</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 12: Ecosystem -->
+        <div class="slide">
+            <h1>Modern ML Ecosystem</h1>
+            <p>The tools and platforms powering today's ML applications:</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col">
+                    <div class="icon-box">
+                        <h3>💻 Languages</h3>
+                        <p style="font-size: 1rem;"><span class="badge">Python</span> <span class="badge">R</span> <span class="badge">Julia</span></p>
+                    </div>
+                    <div class="icon-box" style="margin-top: 1rem;">
+                        <h3>🧠 Frameworks</h3>
+                        <p style="font-size: 1rem;"><span class="badge">PyTorch</span> <span class="badge">TensorFlow</span> <span class="badge">scikit-learn</span></p>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div class="icon-box">
+                        <h3>☁️ Cloud Platforms</h3>
+                        <p style="font-size: 1rem;"><span class="badge">AWS SageMaker</span> <span class="badge">Google Vertex AI</span> <span class="badge">Azure ML</span></p>
+                    </div>
+                    <div class="icon-box" style="margin-top: 1rem;">
+                        <h3>🤗 Model Hubs</h3>
+                        <p style="font-size: 1rem;"><span class="badge">HuggingFace</span> <span class="badge">OpenAI API</span> <span class="badge">Replicate</span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 1rem;">
+                <p><strong>In this course:</strong> We'll primarily use <strong>R</strong> and <strong>Python</strong> with packages like tidymodels, scikit-learn, and more. Focus on understanding concepts that transfer across tools.</p>
+            </div>
+        </div>
+
+        <!-- Slide 13: ML in Business -->
+        <div class="slide">
+            <h1>ML in Business</h1>
+            <p>Real-world applications driving billions in value:</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col icon-box">
+                    <div class="icon">🎯</div>
+                    <h3>Recommendation</h3>
+                    <p style="font-size: 1rem;">Netflix, Amazon, Spotify</p>
+                    <p style="font-size: 0.9rem; color: #38a169;"><strong>$1B/year</strong> value to Netflix</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">🛡️</div>
+                    <h3>Fraud Detection</h3>
+                    <p style="font-size: 1rem;">Banks, payment systems</p>
+                    <p style="font-size: 0.9rem; color: #38a169;">Real-time protection</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">💬</div>
+                    <h3>NLP & Chatbots</h3>
+                    <p style="font-size: 1rem;">Customer service, search</p>
+                    <p style="font-size: 0.9rem; color: #38a169;">24/7 automation</p>
+                </div>
+                <div class="flex-col icon-box">
+                    <div class="icon">📊</div>
+                    <h3>Forecasting</h3>
+                    <p style="font-size: 1rem;">Demand, sales, inventory</p>
+                    <p style="font-size: 0.9rem; color: #38a169;">Supply chain optimization</p>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 1rem;">
+                <p><strong>Key Insight:</strong> The most successful ML applications solve <em>specific, well-defined problems</em> with clear business value and available data.</p>
+            </div>
+        </div>
+
+        <!-- Slide 14: ML in Research -->
+        <div class="slide">
+            <h1>ML in Scientific Research</h1>
+            <p>Transforming how we do research and discover knowledge:</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col">
+                    <div class="highlight-box">
+                        <h3>📊 New Data Sources</h3>
+                        <ul style="font-size: 1rem;">
+                            <li>Text mining from documents</li>
+                            <li>Image & satellite analysis</li>
+                            <li>Sensor & IoT data</li>
+                            <li>Social media signals</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div class="highlight-box">
+                        <h3>🔬 Research Applications</h3>
+                        <ul style="font-size: 1rem;">
+                            <li>Variable selection & dimension reduction</li>
+                            <li>Missing data imputation</li>
+                            <li>Non-parametric estimation</li>
+                            <li>Better forecasting models</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div style="background: var(--slide-bg); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                <h3>🧬 Breakthrough Examples</h3>
+                <p style="font-size: 1rem;">
+                    <span class="badge">AlphaFold</span> Protein structure prediction |
+                    <span class="badge">Drug Discovery</span> Accelerated molecule screening |
+                    <span class="badge">Climate</span> Weather & climate modeling
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 15: Conclusion -->
+        <div class="slide title-slide">
+            <h1>🎯 What's Ahead</h1>
+            <h2 style="font-weight: bold; color: white;">Key Vocabulary to Master</h2>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem; margin: 1.5rem 0;">
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Features (X)</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Labels (Y)</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Training</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Hyperparameters</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Cross-Validation</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Overfitting</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Bias-Variance</span>
+                <span class="badge" style="font-size: 1.1rem; padding: 0.5rem 1rem;">Regularization</span>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 1.5rem; border-radius: 12px; margin-top: 1rem;">
+                <p style="color: white; font-size: 1.3rem; text-align: center;">
+                    <em>"Is Machine Learning always better?"</em><br>
+                    <span style="font-size: 1.1rem; color: var(--accent-light);">Sometimes a simple model beats complexity. <strong>Understanding the problem matters most.</strong></span>
+                </p>
+            </div>
+            <p style="margin-top: 2rem; font-size: 1.2rem;">Welcome to MBAN 5560! 🚀</p>
+        </div>
+
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="prevSlide()">← Previous</button>
+        <button class="btn" onclick="nextSlide()">Next →</button>
+    </div>
+
+    <div class="slide-number" id="slideNum">1 / 15</div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const slideNumDisplay = document.getElementById('slideNum');
+        const totalSlides = 15;
+
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.remove('active');
+                if (i === index) slide.classList.add('active');
+            });
+            slideNumDisplay.textContent = `${index + 1} / ${totalSlides}`;
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowRight' || event.key === ' ') nextSlide();
+            else if (event.key === 'ArrowLeft') prevSlide();
+        });
+
+        showSlide(0);
+    </script>
+</body>
+</html>
