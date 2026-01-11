@@ -234,42 +234,76 @@
             </div>
         </div>
 
-        <!-- Slide 3: AI/ML Landscape -->
+        <!-- Slide 3: Trainable vs Untrainable Models -->
         <div class="slide">
-            <h1>The AI Revolution (2020-2026)</h1>
-            <p>We're living through the most significant AI advancement in history:</p>
-            <div class="flex-row" style="margin-top: 1rem;">
+            <h1>Trainable vs. Untrainable Models</h1>
+            <p>What makes a model "learnable"? The presence of <strong>hyperparameters</strong> that can be tuned.</p>
+            <div class="flex-row" style="margin-top: 1.5rem;">
                 <div class="flex-col">
-                    <div class="stat-box">
-                        <div class="number">175B+</div>
-                        <p>Parameters in GPT-3</p>
+                    <div class="highlight-box" style="border-color: #e53e3e; background: linear-gradient(135deg, #fed7d7 0%, #fff5f5 100%);">
+                        <h3 style="color: #e53e3e;">❌ Untrainable Models</h3>
+                        <p style="font-size: 1.1rem;">No hyperparameters to tune</p>
+                        <ul style="font-size: 1rem;">
+                            <li><strong>Simple Linear Regression (OLS)</strong></li>
+                            <li>Minimizes Σ(y - ŷ)² directly</li>
+                            <li>One solution, no tuning needed</li>
+                        </ul>
+                        <p style="font-size: 0.95rem; margin-top: 0.5rem;"><em>Parameters are found analytically</em></p>
                     </div>
                 </div>
                 <div class="flex-col">
-                    <div class="stat-box">
-                        <div class="number">100M</div>
-                        <p>ChatGPT users in 2 months</p>
-                    </div>
-                </div>
-                <div class="flex-col">
-                    <div class="stat-box">
-                        <div class="number">$200B+</div>
-                        <p>AI market by 2026</p>
+                    <div class="highlight-box" style="border-color: #38a169; background: linear-gradient(135deg, #c6f6d5 0%, #f0fff4 100%);">
+                        <h3 style="color: #38a169;">✅ Trainable Models</h3>
+                        <p style="font-size: 1.1rem;">Have hyperparameters to optimize</p>
+                        <ul style="font-size: 1rem;">
+                            <li><strong>Ridge/LASSO Regression</strong> (λ penalty)</li>
+                            <li><strong>k-Nearest Neighbors</strong> (k value)</li>
+                            <li><strong>Neural Networks</strong> (layers, neurons)</li>
+                        </ul>
+                        <p style="font-size: 0.95rem; margin-top: 0.5rem;"><em>Require cross-validation to tune</em></p>
                     </div>
                 </div>
             </div>
             <div class="highlight-box" style="margin-top: 1rem;">
-                <h3>🚀 Key Breakthroughs</h3>
-                <p>
-                    <span class="badge">Transformers</span>
-                    <span class="badge">Large Language Models</span>
-                    <span class="badge">Generative AI</span>
-                    <span class="badge">Foundation Models</span>
-                    <span class="badge">Multimodal AI</span>
-                    <span class="badge">AI Agents</span>
-                </p>
+                <h3>🎯 Key Insight</h3>
+                <p><strong>Hyperparameters</strong> control model complexity. Training = finding the best hyperparameter values using validation data. This is what makes ML models "self-learning".</p>
             </div>
-            <p style="margin-top: 0.5rem;"><strong>Foundation Models:</strong> Pre-trained on massive data, then fine-tuned for specific tasks (GPT, Claude, Llama, BERT)</p>
+        </div>
+
+        <!-- Slide 4: ML History -->
+        <div class="slide">
+            <h1>Not New... But Evolving</h1>
+            <p>Machine Learning is not a monolithic concept but a <strong>collection of tools and techniques</strong> with origins spanning 70+ years.</p>
+            <div class="flex-row" style="margin-top: 1rem;">
+                <div class="flex-col">
+                    <div style="background: var(--slide-bg); padding: 1.2rem; border-radius: 12px; border: 2px solid var(--accent);">
+                        <h3>📖 Definition (MIT Press)</h3>
+                        <p style="font-size: 1.05rem;"><em>"Machine learning is programming computers to optimize a performance criterion using example data or past experience."</em></p>
+                    </div>
+                    <div class="highlight-box" style="margin-top: 1rem;">
+                        <h3>🔑 Key Components</h3>
+                        <ul style="font-size: 1rem;">
+                            <li><strong>Statistical models</strong> for predictions</li>
+                            <li><strong>Efficient algorithms</strong> for optimization</li>
+                            <li><strong>Powerful machines</strong> for execution</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-col">
+                    <div style="background: var(--slide-bg); padding: 1rem; border-radius: 12px;">
+                        <h3>📅 Key Milestones</h3>
+                        <div style="font-size: 0.95rem;">
+                            <p><span class="badge">1950s</span> Perceptron, early neural nets</p>
+                            <p><span class="badge">1980s</span> Decision trees, backpropagation</p>
+                            <p><span class="badge">1990s</span> SVMs, ensemble methods</p>
+                            <p><span class="badge">2000s</span> Random forests, boosting</p>
+                            <p><span class="badge">2010s</span> Deep learning revolution</p>
+                            <p><span class="badge">2020s</span> LLMs, foundation models</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p style="margin-top: 0.5rem; text-align: center;"><em>No "mysterious" machines - just well-defined statistical models optimized by efficient algorithms!</em></p>
         </div>
 
         <!-- Slide 4: What ML Does -->
@@ -601,7 +635,7 @@
                     </div>
                     <div class="icon-box" style="margin-top: 1rem;">
                         <h3>🧠 Frameworks</h3>
-                        <p style="font-size: 1rem;"><span class="badge">PyTorch</span> <span class="badge">TensorFlow</span> <span class="badge">scikit-learn</span></p>
+                        <p style="font-size: 1rem;"><span class="badge">scikit-learn</span> <span class="badge">Caret</span> <span class="badge">H2O</span> <span class="badge">PyTorch</span> <span class="badge">TensorFlow</span></p>
                     </div>
                 </div>
                 <div class="flex-col">
@@ -616,7 +650,7 @@
                 </div>
             </div>
             <div class="highlight-box" style="margin-top: 1rem;">
-                <p><strong>In this course:</strong> We'll primarily use <strong>R</strong> and <strong>Python</strong> with packages like tidymodels, scikit-learn, and more. Focus on understanding concepts that transfer across tools.</p>
+                <p><strong>In this course:</strong> We'll primarily use <strong>R</strong> and <strong>Python</strong> with packages like Caret, tidymodels, scikit-learn, and more. Focus on understanding concepts that transfer across tools.</p>
             </div>
         </div>
 
@@ -628,26 +662,26 @@
                 <div class="flex-col icon-box">
                     <div class="icon">🎯</div>
                     <h3>Recommendation</h3>
-                    <p style="font-size: 1rem;">Netflix, Amazon, Spotify</p>
-                    <p style="font-size: 0.9rem; color: #38a169;"><strong>$1B/year</strong> value to Netflix</p>
+                    <p style="font-size: 0.95rem;"><strong>Objective:</strong> Increase customer retention by 15% through personalized product suggestions</p>
+                    <p style="font-size: 0.85rem; color: #718096;"><em>Netflix, Amazon, Spotify</em></p>
                 </div>
                 <div class="flex-col icon-box">
                     <div class="icon">🛡️</div>
                     <h3>Fraud Detection</h3>
-                    <p style="font-size: 1rem;">Banks, payment systems</p>
-                    <p style="font-size: 0.9rem; color: #38a169;">Real-time protection</p>
+                    <p style="font-size: 0.95rem;"><strong>Objective:</strong> Reduce false positives by 30% while maintaining 99.9% fraud catch rate</p>
+                    <p style="font-size: 0.85rem; color: #718096;"><em>Banks, payment systems</em></p>
                 </div>
                 <div class="flex-col icon-box">
                     <div class="icon">💬</div>
                     <h3>NLP & Chatbots</h3>
-                    <p style="font-size: 1rem;">Customer service, search</p>
-                    <p style="font-size: 0.9rem; color: #38a169;">24/7 automation</p>
+                    <p style="font-size: 0.95rem;"><strong>Objective:</strong> Handle 80% of customer inquiries without human intervention</p>
+                    <p style="font-size: 0.85rem; color: #718096;"><em>Customer service, search</em></p>
                 </div>
                 <div class="flex-col icon-box">
                     <div class="icon">📊</div>
                     <h3>Forecasting</h3>
-                    <p style="font-size: 1rem;">Demand, sales, inventory</p>
-                    <p style="font-size: 0.9rem; color: #38a169;">Supply chain optimization</p>
+                    <p style="font-size: 0.95rem;"><strong>Objective:</strong> Reduce inventory costs by 20% through accurate demand prediction</p>
+                    <p style="font-size: 0.85rem; color: #718096;"><em>Supply chain, retail</em></p>
                 </div>
             </div>
             <div class="highlight-box" style="margin-top: 1rem;">
@@ -723,13 +757,13 @@
         <button class="btn" onclick="nextSlide()">Next →</button>
     </div>
 
-    <div class="slide-number" id="slideNum">1 / 15</div>
+    <div class="slide-number" id="slideNum">1 / 16</div>
 
     <script>
         let currentSlide = 0;
         const slides = document.querySelectorAll('.slide');
         const slideNumDisplay = document.getElementById('slideNum');
-        const totalSlides = 15;
+        const totalSlides = 16;
 
         function showSlide(index) {
             slides.forEach((slide, i) => {
