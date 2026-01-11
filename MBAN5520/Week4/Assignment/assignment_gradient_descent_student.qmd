@@ -1,0 +1,327 @@
+---
+title: "Gradient Descent Assignment"
+subtitle: "From Optimization to Regression - Due on December 4"
+author: "MBAN5520 - Statistics"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    #number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  eval: false
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+set.seed(5520)
+```
+
+# Introduction
+
+In this assignment, you will implement gradient descent (GD) from scratch to solve two problems:
+
+1. **Part A**: A manufacturing cost optimization problem (40 points)
+2. **Part B**: Predicting energy consumption using regression (60 points)
+
+**Total: 100 points**
+
+---
+
+# Part A: Manufacturing Cost Optimization
+
+## Business Context
+
+A manufacturing company produces electronic components. The operations manager needs to determine the **optimal production batch size** to minimize total costs. The production process involves:
+
+- **Setup costs**: Each production run requires machine setup, which costs $500. This cost is spread across all units in the batch, so larger batches reduce the per-unit setup cost.
+- **Holding costs**: Inventory storage costs increase with batch size. Larger batches mean more inventory sitting in warehouses.
+- **Variable costs**: Raw materials and labor cost $15 per hundred units.
+- **Fixed overhead**: Monthly fixed costs are $100.
+
+After analysis, the cost function (in hundreds of dollars) as a function of batch size $q$ (in hundreds of units) is:
+
+$$C(q) = \frac{500}{q} + 2q^2 + 15q + 100$$
+
+**Your task**: Use gradient descent to find the optimal batch size that minimizes total monthly cost.
+
+---
+
+### **Question 1** (8 points): Implement Cost and Gradient Functions
+
+Derive the gradient $C'(q)$ and implement both the cost function and its gradient in R.
+
+**Show your derivation:**
+$$C'(q) = ?$$
+
+```{r q1-functions}
+# Cost function
+C_cost <- function(q) {
+  # YOUR CODE HERE
+}
+
+# Gradient function  
+C_gradient <- function(q) {
+  # YOUR CODE HERE
+}
+
+# Test: C(5) should equal 325
+C_cost(5)
+```
+
+---
+
+### **Question 2** (8 points): Implement Gradient Descent
+
+Implement a gradient descent function that takes starting value, learning rate, and number of iterations as inputs. The update rule is: $q_{new} = q_{current} - \alpha \cdot C'(q_{current})$
+
+```{r q2-gd}
+gradient_descent <- function(start_q, learning_rate, n_iterations) {
+  # YOUR CODE HERE
+  # Return a data frame with columns: iteration, q, cost
+}
+```
+
+---
+
+### **Question 3** (6 points): Find the Optimal Batch Size
+
+Run gradient descent with starting value $q = 1$, learning rate $\alpha = 0.01$, for 100 iterations.
+
+```{r q3-run}
+# YOUR CODE HERE
+```
+
+**Questions to answer:**
+
+a) What is the optimal batch size in hundreds of units? Convert to actual units.
+b) What is the minimum total cost? Convert to actual dollars.
+c) What recommendation would you give to the operations manager?
+
+**Your Answer:**
+
+---
+
+### **Question 4** (6 points): Analyze Cost Components at Optimal
+
+At the optimal batch size you found, calculate each cost component separately (setup, holding, variable, fixed). Create a summary table.
+
+```{r q4-components}
+# YOUR CODE HERE
+```
+
+**Question:** Which cost component is the largest at the optimal batch size? Why does this make business sense?
+
+**Your Answer:**
+
+---
+
+### **Question 5** (6 points): Learning Rate Impact
+
+Test three learning rates: 0.001, 0.01, and 0.05. Compare how quickly they reach the optimal solution.
+
+```{r q5-learning-rates}
+# YOUR CODE HERE
+```
+
+**Question:** If you could only run 20 iterations (limited computing resources), which learning rate would give the best business answer? Why?
+
+**Your Answer:**
+
+---
+
+### **Question 6** (6 points): Verify with Analytical Solution
+
+The optimal batch size can be found analytically by setting $C'(q) = 0$. Verify your GD result matches the analytical solution.
+
+> **Tip:** Use R's `uniroot()` function to find where $C'(q) = 0$, or use `optimize()` to directly find the minimum of $C(q)$ over an interval.
+
+```{r q6-verify}
+# YOUR CODE HERE
+```
+
+**Question:** How close is your GD solution to the exact answer? Would this difference matter for the business decision?
+
+**Your Answer:**
+
+---
+
+# Part B: Energy Consumption Prediction
+
+## Business Context
+
+A utility company wants to predict building energy consumption based on outdoor temperature. Understanding this relationship helps with:
+
+- Demand forecasting for power grid management
+- Setting electricity rates
+- Planning for peak usage periods
+
+The dataset contains daily temperature (°C) and energy consumption (kWh) measurements.
+
+Energy consumption follows a U-shaped pattern - high at cold temperatures (heating), low at moderate temperatures, and high at hot temperatures (cooling). We'll model this with a quadratic regression:
+
+$$\text{consumption} = \beta_0 + \beta_1 \cdot \text{temp} + \beta_2 \cdot \text{temp}^2$$
+
+---
+
+### **Question 7** (6 points): Prepare the Data
+
+Load the data and create the design matrix with intercept, temperature, and temperature squared. Standardize the predictors.
+
+```{r q7-prepare}
+# Load data
+energy <- read.csv("energy_consumption.csv")
+
+# YOUR CODE HERE:
+# 1. Add temperature squared column
+# 2. Standardize predictors (not the response)
+# 3. Create design matrix X and response vector y
+```
+
+---
+
+### **Question 8** (10 points): Implement RSS and Gradient Functions
+
+You can implement these using **either matrix algebra or scalar algebra** (choose one approach).
+
+**Option A: Matrix Algebra**
+
+- RSS: $RSS(\beta) = (y - X\beta)^T(y - X\beta)$
+- Gradient: $\nabla RSS = -2X^T(y - X\beta)$
+
+**Option B: Scalar Algebra**
+
+For our model $\hat{y}_i = \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i}$, the gradients are:
+
+$$\frac{\partial RSS}{\partial \beta_0} = -2\sum_{i=1}^{n}(y_i - \hat{y}_i)$$
+
+$$\frac{\partial RSS}{\partial \beta_1} = -2\sum_{i=1}^{n}x_{1i}(y_i - \hat{y}_i)$$
+
+$$\frac{\partial RSS}{\partial \beta_2} = -2\sum_{i=1}^{n}x_{2i}(y_i - \hat{y}_i)$$
+
+```{r q8-functions}
+compute_RSS <- function(X, y, beta) {
+  # YOUR CODE HERE (using matrix %*% or scalar sum())
+}
+
+compute_gradient <- function(X, y, beta) {
+  # YOUR CODE HERE (using matrix t(X) %*% or scalar sum())
+}
+```
+
+---
+
+### **Question 9** (8 points): Implement Gradient Descent for Regression
+
+Implement gradient descent for multiple linear regression. Use your functions from Q8.
+
+```{r q9-gd-regression}
+gd_regression <- function(X, y, learning_rate, n_iterations) {
+  # YOUR CODE HERE
+  # Return list with: beta (coefficients), rss_history (RSS at each iteration)
+}
+```
+
+---
+
+### **Question 10** (6 points): Run Gradient Descent
+
+Run GD with learning rate 1e-6 for 5000 iterations. Report the coefficients and RSS reduction.
+
+```{r q10-run}
+# YOUR CODE HERE
+```
+
+---
+
+### **Question 11** (6 points): Compare with OLS
+
+Fit the same model using `lm()` and compare coefficients.
+
+```{r q11-compare}
+# YOUR CODE HERE
+```
+
+**Question:** How close are the GD coefficients to OLS? What would bring them closer?
+
+**Your Answer:**
+
+---
+
+### **Question 12** (6 points): Learning Rate Sensitivity
+
+Test learning rates: 1e-7, 1e-6, and 1e-5. Compare convergence.
+
+```{r q12-lr}
+# YOUR CODE HERE
+```
+
+**Question:** What happens with each learning rate? Which would you recommend?
+
+**Your Answer:**
+
+---
+
+### **Question 13** (6 points): Predict Energy Consumption
+
+Using your GD model, predict energy consumption for temperatures: -5°C, 15°C, and 30°C.
+
+```{r q13-predict}
+# YOUR CODE HERE
+```
+
+**Question:** Which temperature has the lowest predicted consumption? Does this make sense given the U-shaped relationship?
+
+**Your Answer:**
+
+---
+
+### **Question 14** (6 points): Business Interpretation
+
+Find the temperature at which energy consumption is minimized.
+
+```{r q14-business}
+# YOUR CODE HERE
+```
+
+**Question:** At what temperature does the building require minimum energy? How could the utility company use this information for demand planning?
+
+**Your Answer:**
+
+---
+
+### **Question 15** (6 points): Final Summary
+
+Compare GD and OLS on computation time and accuracy.
+
+```{r q15-summary}
+# YOUR CODE HERE
+```
+
+**Question:** For this problem (200 observations, 3 parameters), which method is better? When would gradient descent be the preferred choice?
+
+**Your Answer:**
+
+---
+
+# Submission Checklist
+
+- [ ] Completed all 15 questions
+- [ ] All code runs without errors
+- [ ] Answered all interpretation questions
+- [ ] Connected results to business context
+
+---
+
+**End of Assignment**

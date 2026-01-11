@@ -1,0 +1,125 @@
+---
+title: "Regression Analysis Assignment - MBAN 5520 - Due on November 4 11:59pm"
+subtitle: "Predicting House Prices: A Practical Application of Linear Regression"
+author: "Your Name Here"
+date: today
+format: 
+  html:
+    embed-resources: true
+    toc: true
+    toc-depth: 1
+    theme: cosmo
+---
+
+# Introduction
+
+In this assignment, you will apply regression analysis concepts to predict house sale prices using the Ames Housing dataset. This practical exercise will help you understand data preprocessing, exploratory analysis, model building, interpretation, and prediction.
+
+**Dataset:** Ames Housing data contains information about residential home sales in Ames, Iowa from 2006 to 2010, with 80+ variables describing various aspects of homes.
+
+Here is the link [Ames Housing Dataset](https://www.kaggle.com/datasets/prevek18/ames-housing-dataset) for more information about the dataset.
+
+Please note:
+  
+- You can team up with two classmates for this assignment (total 3 max). Submit one assignment per team. 
+- Use R and R Markdown for your analysis. Submit the rendered HTML file along with the R Markdown source file. 
+- Cite any external sources you use. 
+- Make sure your code runs without errors and produces the expected outputs. 
+- Clearly label each section and question in your submission. 
+- Provide interpretations and explanations for your results, not just code outputs. 
+- Using LLM of your choice is allowed, but you must disclose which tool you used and how it assisted you in your analysis.  
+
+---
+
+# A Data Loading, Preprocessing and Exploratory Data Analysis
+
+**Task:** 
+  
+- Load the Ames Housing dataset from `../AmesHousing.csv`.  
+- Select the following variables: `SalePrice`, `Gr.Liv.Area`, `Overall.Qual`, `Year.Built`, `Garage.Cars`, `Full.Bath`, `Total.Bsmt.SF`, `Neighborhood`, `Lot.Area`, `Bedroom.AbvGr`, `Year.Remod.Add`. 
+- Handle missing values by removing any rows with NA values. Create a new variable HouseAge = max(Year.Built) - Year.Built.  
+
+#### **Question 1 (3 points)**: How many observations were removed due to missing values?
+#### **Question 2 (3 points)**: What is the mean and standard deviation of SalePrice?
+#### **Question 3 (3 points)**: Does SalePrice follow a normal distribution? What does the Q-Q plot suggest?
+#### **Question 4 (3 points)**: Which three variables show the strongest correlation with SalePrice?
+#### **Question 5 (3 points)**: Based on scatter plots, which variable appears to have the strongest linear relationship with SalePrice?
+
+---
+
+# B Building the Regression Model
+
+**Task:** Build a multiple linear regression model: 
+
+$$\text{SalePrice} = \beta_0 + \beta_1 \cdot \text{Gr.Liv.Area} + \beta_2 \cdot \text{Overall.Qual} + \beta_3 \cdot \text{Year.Built} + \beta_4 \cdot \text{Garage.Cars}$$
+$$+ \beta_5 \cdot \text{Full.Bath} +\beta_6 \cdot \text{Total.Bsmt.SF} + \beta_7 \cdot \text{Lot.Area} + \beta_8 \cdot \text{Bedroom.AbvGr} + \epsilon$$
+
+#### **Question 6 (4 points)**: Interpret the coefficient for Gr.Liv.Area. What does it tell us?
+#### **Question 7 (4 points)**: Interpret the coefficient for Overall.Qual. Is the effect meaningful?
+#### **Question 8 (4 points)**: Calculate the estimated sale price for a house with: Living area=2000 sq ft, Quality=7, Year built=2000, Garage=2 cars, Bathrooms=2, Basement=1000 sq ft, Lot=10000 sq ft, Bedrooms=3.
+
+---
+
+# C Which Factors Affect Price Most?
+
+**Task:** Calculate standardized coefficients by standardizing all predictor variables (mean=0, sd=1) and re-estimating the model. Create a table ranking predictors by absolute value of standardized coefficients. Create a coefficient plot showing estimates with 95% confidence intervals.
+
+#### **Question 9 (4 points)**: Based on standardized coefficients, which three factors have the largest impact on SalePrice?
+#### **Question 10 (4 points)**: Why do we use standardized coefficients to compare variable importance?
+
+---
+
+# D Statistical Significance and Confidence Intervals
+
+**Task:** Review 95% confidence intervals for all coefficients. Create a significance summary table categorizing predictors (*** p<0.001, ** p<0.01, * p<0.05, . p<0.10, not significant).
+
+#### **Question 11 (5 points)**: For Overall.Qual, what is the 95% confidence interval and what does it mean?
+#### **Question 12 (4 points)**: Does the confidence interval for Bedroom.AbvGr contain zero? What does this imply?
+#### **Question 13 (5 points)**: Which predictors are statistically significant at the 0.05 level?
+#### **Question 14 (4 points)**: Is any predictor NOT statistically significant? What should we consider doing with it?
+
+---
+
+# E Model Quality Metrics
+
+**Task:** Report R-squared, Adjusted R-squared, Residual Standard Error, F-statistic, and F-test p-value. Create four diagnostic plots: Residuals vs Fitted, Normal Q-Q, Scale-Location, and Residuals vs Leverage.
+
+#### **Question 15 (4 points)**: What percentage of variation in SalePrice is explained by the model?
+#### **Question 16 (4 points)**: Why is Adjusted R² lower than R²? Which should we use when comparing models?
+#### **Question 17 (5 points)**: What does the F-statistic tell us? Is the model statistically significant overall?
+#### **Question 18 (5 points)**: Based on residual plots, does the model satisfy assumptions of linear regression (linearity, homoscedasticity, normality)?
+
+---
+
+# F Prediction with Train-Test Split
+
+**Task:** Set seed to 5520. Create 75-25 train-test split. Re-estimate the model on training data. Make predictions on test set with 95% prediction intervals. Calculate RMSE, MAE, and MAPE. Create three plots: (1) Actual vs Predicted, (2) Residual plot, (3) Histogram of errors.
+
+#### **Question 19 (5 points)**: Compare R² from training model to full model. Are they similar?
+#### **Question 20 (5 points)**: What is the average prediction error (MAE) in dollars for the test set?
+#### **Question 21 (5 points)**: Is your RMSE good or bad? How would you evaluate this?
+
+---
+
+# G Prediction Intervals and Uncertainty
+
+**Task:** For a house with Living area=1800, Quality=7, Year=2005, Garage=2, Bathrooms=2, Basement=900, Lot=9000, Bedrooms=3: calculate point prediction, 95% prediction interval, and 95% confidence interval. Check coverage rate: what percentage of test set actual prices fall within their 95% prediction intervals? Visualize 100 sampled predictions with intervals.
+
+#### **Question 22 (5 points)**: What is the difference between a prediction interval and confidence interval? Which is wider and why?
+#### **Question 23 (5 points)**: Is your empirical coverage rate close to 95%? What might explain differences?
+#### **Question 24 (4 points)**: Looking at your visualization, are most actual prices captured within prediction intervals?
+
+---
+
+**Submission Checklist:**
+  
+- [ ] All code chunks completed 
+- [ ] All 24 questions answered with complete explanations
+- [ ] All required visualizations included 
+- [ ] Clear interpretations of coefficients and tests 
+- [ ] Connected analysis to BLUE theory 
+- [ ] Document renders to HTML successfully. 
+
+---
+
+**Good luck with your analysis!**

@@ -1,0 +1,1064 @@
+---
+title: "Inferential Statistics: Understanding Estimators and BLUE Properties"
+subtitle: "Exploring X̄ as the Best Linear Unbiased Estimator of Population Mean"
+author: "Dr. Aydede"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+library(gganimate)
+library(patchwork)
+```
+
+# What is Inferential Statistics?
+
+## Definition and Purpose
+
+**Inferential statistics** is the branch of statistics that allows us to make conclusions about a **population** based on information from a **sample**. While descriptive statistics summarizes data we have, inferential statistics helps us make predictions and test hypotheses about data we don't have.
+
+```{r intro-viz, fig.height=8}
+# Create a visual representation of inferential statistics
+set.seed(123)
+
+# Create population
+population_size <- 10000
+population <- rnorm(population_size, mean = 100, sd = 45)
+
+# Take multiple samples
+n_samples <- 5
+sample_size <- 30
+samples <- list()
+sample_means <- numeric(n_samples)
+```
+
+Here we have a population with a true mean (μ) of 100. We will take 5 different random samples of size 30 from this population and calculate the sample mean (x̄) for each sample.
+
+```{r, fig.height=8}
+for (i in 1:n_samples) {
+  samples[[i]] <- sample(population, sample_size)
+  sample_means[i] <- mean(samples[[i]])
+}
+
+#Sample Means from 5 Different Samples
+for (i in 1:n_samples) {
+  cat(sprintf("Sample %d: x̄ = %.2f\n", i, sample_means[i]))
+}
+```
+
+Notice how each sample gives a different estimate of μ (the population mean). This variability is a fundamental aspect of inferential statistics.
+
+```{r, fig.height=8, echo=FALSE}
+
+# Create visualization
+colors <- c("lightgreen", "lightcoral", "lightyellow", "lightpink", "lightcyan")
+par(mfrow = c(3, 2))
+
+# Population (top left)
+hist(population, breaks = 50, col = "lightblue", border = "white",
+     main = "Population (Usually Unknown)", xlab = "Value", 
+     xlim = c(50, 150), prob = TRUE, ylim = c(0, 0.03))
+abline(v = mean(population), col = "red", lwd = 3, lty = 2)
+text(mean(population), 0.028, "μ = 100", pos = 4, col = "red", font = 2)
+
+# All 5 Samples
+for (i in 1:5) {
+  hist(samples[[i]], breaks = 12, col = colors[i], border = "white",
+       main = paste("Sample", i, "(n = 30)"), xlab = "Value", 
+       xlim = c(50, 150), prob = TRUE, ylim = c(0, 0.05))
+  abline(v = sample_means[i], col = "darkgreen", lwd = 3, lty = 2)
+  abline(v = 100, col = "red", lwd = 1, lty = 3)  # True mean
+  text(sample_means[i], 0.045, paste("x̄ =", round(sample_means[i], 1)), 
+       pos = ifelse(sample_means[i] < 100, 2, 4), col = "darkgreen", font = 2, cex = 0.9)
+  
+  # Add legend for first sample
+  if (i == 1) {
+    legend("topright", 
+           legend = c("Sample mean", "True μ"),
+           col = c("darkgreen", "red"),
+           lty = c(2, 3),
+           lwd = c(3, 1),
+           cex = 0.7)
+  }
+}
+
+par(mfrow = c(1, 1))
+
+# Create a summary table of the samples
+sample_summary <- data.frame(
+  Sample = 1:5,
+  Sample_Mean = sample_means,
+  Deviation = sample_means - 100,
+  Sample_Min = sapply(samples, min),
+  Sample_Max = sapply(samples, max),
+  Sample_SD = sapply(samples, sd)
+)
+
+kable(sample_summary, digits = 2,
+      caption = "Summary Statistics for 5 Different Samples (Each n=30)",
+      col.names = c("Sample", "Mean", "Deviation from population Mean", "Min", "Max", "SD")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  row_spec(which.min(abs(sample_summary$Deviation)), 
+           bold = TRUE, color = "white", background = "green")
+```
+
+As we can see, each sample gives us a different estimate of the population mean. We cannot just take one sample and assume it gives us the correct value. This raises a crucial question: **How do we know how reliable our estimate is?** This is where the concept of sampling distributions becomes essential.
+
+### Key Concepts in Inferential Statistics:
+
+1. **Population Parameter** (θ): A fixed but unknown value that describes the entire population
+   - Examples: μ (population mean), σ² (population variance), p (population proportion)
+
+2. **Sample Statistic**: A value calculated from sample data
+   - Examples: x̄ (sample mean), s² (sample variance), p̂ (sample proportion)
+
+3. **Estimator**: A rule or formula for calculating an estimate of a population parameter
+   - An estimator is a function of the sample data
+   - Different estimators can be used to estimate the same parameter
+
+4. **Estimate**: The actual numerical value obtained by applying an estimator to a specific sample
+
+## The Central Question
+
+> **How can we use sample information to make reliable statements about population parameters?**
+
+To answer this, we need to understand how our estimators behave across all possible samples - this is the concept of a sampling distribution.
+
+# Sampling Distributions
+
+## Understanding Sampling Distributions
+
+The **sampling distribution** of a statistic is the probability distribution of that statistic when calculated from all possible samples of the same size from the population.
+
+Key insight: While we typically only have one sample, the sampling distribution tells us about the behavior of our estimator across all possible samples. The sampling distribution is a hypothetical distribution that helps us understand the variability and reliability of our estimates.
+
+Let's first demonstrate sampling distributions with a realistic example before looking at the simpler theoretical case.
+
+We'll simulate a population of 10,000 university students with ages that reflect a typical university distribution:
+
+```{r create-population}
+# Create a realistic population of university student ages
+set.seed(123)
+
+# Generate a population of 10,000 university students
+# Most students are 18-25, with peak around 20-21
+population_ages <- c(
+  rep(18, 800),   # Freshmen
+  rep(19, 1200),  # Freshmen/Sophomores
+  rep(20, 1500),  # Sophomores/Juniors  
+  rep(21, 1600),  # Juniors/Seniors
+  rep(22, 1400),  # Seniors/Grad
+  rep(23, 1000),  # Grad students
+  rep(24, 800),   # Grad students
+  rep(25, 600),   # Grad students
+  rep(26, 400),   # PhD students
+  rep(27, 300),   # PhD students
+  rep(28, 200),   # PhD students
+  rep(29, 150),   # PhD students
+  rep(30, 50)     # PhD students
+)
+
+# Add some random variation
+population_ages <- population_ages + round(runif(length(population_ages), -0.4, 0.4))
+
+# Calculate population parameters
+pop_mean <- mean(population_ages)
+pop_sd <- sd(population_ages)
+```
+
+**Population Parameters:**
+  
+- Population size: 10,000 students 
+- Population mean (μ): `r round(pop_mean, 2)` years 
+- Population standard deviation (σ): `r round(pop_sd, 2)` years. 
+
+Here is the distribution of ages in our population:  
+
+```{r viz-population, echo=FALSE}
+# Visualize the population distribution
+hist(population_ages, breaks = 30, col = "lightblue", border = "white",
+     main = "Population Distribution\n(All 10,000 University Students)",
+     xlab = "Age (years)", prob = TRUE)
+abline(v = pop_mean, col = "red", lwd = 3, lty = 2)
+text(pop_mean + 0.5, 0.15, paste("μ =", round(pop_mean, 2)), col = "red", font = 2)
+```
+
+Now we'll draw 100 random samples of 50 students each to create a sampling distribution:
+
+```{r draw-samples}
+
+# Draw 100 samples of 50 students each
+n_samples <- 1000
+sample_size <- 50
+sample_means <- numeric(n_samples)
+
+for (i in 1:n_samples) {
+  sample_i <- sample(population_ages, sample_size, replace = FALSE)
+  sample_means[i] <- mean(sample_i)
+}
+```
+
+**Sampling Process:**
+  
+- Number of samples drawn: 100 
+- Size of each sample: 50 students 
+- Sampling method: Without replacement 
+  
+**First 10 sample means (years):**
+`r paste(round(sample_means[1:10], 2), collapse = ", ")`
+
+let's visualize the sampling distribution of the sample means:
+
+```{r viz-sampling-dist, echo=FALSE}
+
+# Visualize the sampling distribution
+par(mfrow = c(1, 2))
+
+# Left plot: Population distribution (repeat for comparison)
+hist(population_ages, breaks = 30, col = "lightblue", border = "white",
+     main = "Population Distribution",
+     xlab = "Age (years)", prob = TRUE)
+abline(v = pop_mean, col = "red", lwd = 3, lty = 2)
+
+# Right plot: Sampling distribution
+hist(sample_means, breaks = 25, col = "lightgreen", border = "white",
+     main = paste("Sampling Distribution of X̄\n(", n_samples, " samples, n =", sample_size, ")"),
+     xlab = "Sample Mean Age (years)", prob = TRUE)
+abline(v = mean(sample_means), col = "darkgreen", lwd = 3, lty = 2)
+abline(v = pop_mean, col = "red", lwd = 2, lty = 3)
+
+# Add normal curve overlay (Central Limit Theorem)
+x_seq <- seq(min(sample_means), max(sample_means), length.out = 100)
+theoretical_sd <- pop_sd / sqrt(sample_size)
+lines(x_seq, dnorm(x_seq, mean = pop_mean, sd = theoretical_sd), 
+      col = "blue", lwd = 2)
+
+legend("topright", 
+       legend = c("Empirical", "Theory (CLT)"),
+       col = c("lightgreen", "blue"),
+       lty = c(NA, 1),
+       lwd = c(NA, 2),
+       pch = c(15, NA),
+       cex = 0.8)
+
+par(mfrow = c(1, 1))
+```
+
+Let's summarize the key statistics of the sampling distribution and compare them to the population parameters and theoretical expectations:
+
+```{r summary-table, echo=FALSE}
+
+# Create a summary table
+sampling_summary <- data.frame(
+  Statistic = c("Mean", "Standard Deviation", "Minimum", "Maximum"),
+  Population = c(round(pop_mean, 3), round(pop_sd, 3), 
+                 min(population_ages), max(population_ages)),
+  `Sample Means Distribution` = c(round(mean(sample_means), 3), 
+                                  round(sd(sample_means), 3),
+                                  round(min(sample_means), 3), 
+                                  round(max(sample_means), 3)),
+  `Theoretical (CLT)` = c(round(pop_mean, 3), 
+                         round(theoretical_sd, 3),
+                         NA, NA)
+)
+
+kable(sampling_summary, 
+      caption = "Population vs Sampling Distribution Statistics",
+      col.names = c("Statistic", "Population", "Sample Means", "Theoretical (CLT)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Key Observations:**
+  
+- **The sampling distribution is much less variable than the population**: Notice how the standard deviation of sample means is much smaller than the population standard deviation. 
+- **The sample mean is an unbiased estimator**: The mean of the sample means (E[X̄]) is approximately equal to the population mean (μ).
+- **The Central Limit Theorem works**: The sampling distribution appears approximately normal, even though our population may not be perfectly normal.  
+
+## Theoretical Example: Simple 3-Number Population (our example in the class)
+
+Now let's examine a simpler case where we can enumerate ALL possible samples. This example helps us understand sampling distributions because we can calculate every possible outcome.
+
+Let's define a small population with just three values: {0, 3, 12}.
+
+```{r simple-population}
+# Define a simple population with three values
+set.seed(321)
+population <- c(3, 0, 12)
+mu_x <- mean(population)
+sigma_x <- sd(population)
+```
+
+**Simple Population Parameters:**
+  
+- Population values: {`r paste(population, collapse = ", ")`} 
+- Population mean (μ): `r mu_x` 
+- Population standard deviation (σ): `r round(sigma_x, 2)`. 
+
+When we sample with replacement from this 3-element population with sample size n=3, we can enumerate all possible samples:
+
+```{r all-possible-samples}
+# Generate all possible samples of size 3 with replacement
+n <- 3
+all_samples <- expand.grid(X1 = population, X2 = population, X3 = population)
+n_samples <- nrow(all_samples)
+
+# Calculate sample mean for each possible sample
+all_samples$sample_mean <- (all_samples$X1 + all_samples$X2 + all_samples$X3) / 3
+
+# Display first few samples
+head(all_samples) %>%
+  kable(caption = "First 10 Possible Samples from {0, 3, 12} Population", digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Total number of possible samples (with replacement):** `r n_samples` samples
+
+### Sampling Distribution of the Mean
+
+```{r sampling-dist-summary}
+# Create frequency table of sample means
+sampling_dist_summary <- table(all_samples$sample_mean)
+print(sampling_dist_summary)
+```
+
+**Key Result:**
+  
+- Expected value of X̄: `r mean(all_samples$sample_mean)`
+- Population mean μ: `r mu_x` 
+- ✓ These are equal, confirming that X̄ is an unbiased estimator!
+
+Let's visualize the sampling distribution of the sample mean for this simple example alongside our realistic example:
+
+```{r compare-examples, echo=FALSE}
+
+# Visualize both examples side by side
+par(mfrow = c(1, 2))
+
+# Realistic example (university ages)
+hist(sample_means, breaks = 25, col = "lightgreen", border = "white",
+     main = "Realistic Example\n(Student Ages)",
+     xlab = "Sample Mean", prob = TRUE, ylim = c(0, 2))
+abline(v = mean(sample_means), col = "darkgreen", lwd = 2, lty = 2)
+
+# Simple theoretical example
+hist(all_samples$sample_mean, breaks = seq(-0.5, 12.5, by = 1), 
+     col = "lightcoral", border = "white",
+     main = "Theoretical Example\n({0, 3, 12} Population)",
+     xlab = "Sample Mean", prob = TRUE, ylim = c(0, 0.3))
+abline(v = mu_x, col = "darkred", lwd = 2, lty = 2)
+
+par(mfrow = c(1, 1))
+```
+
+This demonstrates that regardless of the complexity of the population, the sampling distribution of the sample mean shares key properties:
+  
+1. The sample mean is an unbiased estimator of the population mean. 
+2. The sampling distribution tends to be normal (or approximately normal) as sample size increases (Central Limit Theorem).  
+
+
+
+## Properties of Sampling Distributions
+
+The sampling distribution of $\bar{X}$ has these important properties:
+
+1. **Mean**: $E[\bar{X}] = \mu$.  Here is the mathematical proof:
+
+   $$E[\bar{X}] = E\left[\frac{1}{n}\sum_{i=1}^{n} X_i\right] = \frac{1}{n}\sum_{i=1}^{n} E[X_i] = \frac{1}{n} \cdot n \mu = \mu$$
+  
+2. **Variance**: $\text{Var}[\bar{X}] = \frac{\sigma^2}{n}$. Here is the mathematical proof:
+
+   $$\text{Var}[\bar{X}] = \text{Var}\left(\frac{1}{n}\sum_{i=1}^{n} X_i\right) = \frac{1}{n^2} \sum_{i=1}^{n} \text{Var}[X_i] = \frac{1}{n^2} \cdot n \sigma^2 = \frac{\sigma^2}{n}$$
+3. **Standard Error**: $SE[\bar{X}] = \frac{\sigma}{\sqrt{n}}$
+
+These properties tell us that:
+  
+- The sample mean is centered at the true population mean (unbiased) 
+- The variability decreases as sample size increases 
+
+## Central Limit Theorem
+
+For large samples, the sampling distribution of $\bar{X}$ approaches a normal distribution, regardless of the population distribution:
+
+$$\bar{X} \sim N\left(\mu, \frac{\sigma^2}{n}\right) \text{ as } n \to \infty$$
+
+```{r clt-demo, echo=FALSE}
+# Demonstrate Central Limit Theorem
+set.seed(654)
+
+# Non-normal population (exponential)
+population_exp <- rexp(10000, rate = 1)
+
+# Sample sizes to test
+sample_sizes <- c(5, 10, 30, 100)
+n_iterations <- 1000
+
+# Calculate sampling distributions for different sample sizes
+sampling_results <- list()
+
+for (n in sample_sizes) {
+  sample_means <- numeric(n_iterations)
+  for (i in 1:n_iterations) {
+    sample_means[i] <- mean(sample(population_exp, n, replace = TRUE))
+  }
+  sampling_results[[as.character(n)]] <- sample_means
+}
+
+# Create plots
+plots <- list()
+for (i in 1:length(sample_sizes)) {
+  n <- sample_sizes[i]
+  data_to_plot <- data.frame(x = sampling_results[[as.character(n)]])
+  
+  p <- ggplot(data_to_plot, aes(x = x)) +
+    geom_histogram(aes(y = ..density..), bins = 30, fill = "lightblue", 
+                   color = "darkblue", alpha = 0.7) +
+    stat_function(fun = dnorm, 
+                  args = list(mean = 1, sd = 1/sqrt(n)),
+                  color = "red", size = 1) +
+    labs(title = paste("n =", n),
+         x = "Sample Mean",
+         y = "Density") +
+    theme_minimal()
+  
+  plots[[i]] <- p
+}
+
+# Combine plots
+(plots[[1]] + plots[[2]]) / (plots[[3]] + plots[[4]]) +
+  plot_annotation(title = "Central Limit Theorem: Sampling Distribution of X̄",
+                  subtitle = "Population: Exponential(λ=1) | Red curve: Theoretical Normal Distribution",
+                  theme = theme(plot.title = element_text(size = 14, face = "bold")))
+```
+
+## The Key Question: Which Estimator to Use?
+
+Now that we understand sampling distributions, we can ask: **If different estimators have different sampling distributions, how do we choose the best one?**
+
+For example, to estimate the population mean $\mu$, we could use:
+  
+- **$\bar{X} = \frac{1}{n}\sum_{i=1}^{n} X_i$** - The sample mean 
+- **$\tilde{X} = \frac{X_1 + X_n}{2}$** - Average of first and last observations 
+- **$X^* = X_1$** - Just the first observation. 
+
+All of these are estimators, and each has its own sampling distribution. We need criteria to determine which is best.
+
+# Why BLUE is Needed for Valid Estimation
+
+Before diving into the technical criteria, let's build intuition about why we need a framework like BLUE.
+
+When estimating a population mean $\mu$, using the sample mean $\bar{X} = \frac{1}{n}\sum_{i=1}^{n} X_i$ seems like common sense. But why is this "obvious" choice actually the best? And why not use alternatives like:
+  
+- **$\tilde{X} = \frac{X_1 + X_n}{2}$** - Just average the first and last observations 
+- **$\hat{X} = \text{median}(X)$** - Use the middle value 
+- **$X^* = X_1$** - Just use the first observation  
+
+Imagine you want to estimate the average height of students in a university:
+
+**Method 1 ($\bar{X}$)**: Measure all 30 students in your sample and take the average
+  
+- Uses ALL available information 
+- Each student contributes equally 
+- Intuition: More data = better estimate 
+
+**Method 2 ($\tilde{X}$)**: Just measure the first and last student who walk in
+  
+- Ignores 28 out of 30 measurements! 
+- Wastes valuable information 
+- What if the first and last happen to be basketball players?  
+  
+**Method 3 ($X^*$)**: Just measure one random student 
+  
+- Even worse - ignores 29 measurements 
+- Extremely unreliable 
+- Like judging a whole movie by one scene 
+
+Let's use our 3-number simple example
+
+```{r blue-intuition}
+# Define population
+population <- c(0, 3, 12)
+mu_x <- mean(population)
+# Generate all possible samples of size 3 with replacement
+n <- 3
+all_samples <- expand.grid(X1 = population, X2 = population, X3 = population)
+n_samples <- nrow(all_samples)
+# Calculate sample means for different estimators
+all_samples$mean_Xbar <- (all_samples$X1 + all_samples$X2 + all_samples$X3) / 3
+all_samples$mean_Xtilde <- (all_samples$X1 + all_samples$X3) / 2
+all_samples$mean_Xstar <- all_samples$X1
+
+# Calculate variances
+var_Xbar <- var(all_samples$mean_Xbar)
+var_Xtilde <- var(all_samples$mean_Xtilde)
+var_Xstar <- var(all_samples$mean_Xstar)
+
+# Create summary table showing means and variances
+blue_summary <- data.frame(
+  Estimator = c("Sample Mean (X̄)", "Average of First and Last (X̃)", "First Observation (X*)"),
+  Expected_Value = c(mean(all_samples$mean_Xbar),
+                     mean(all_samples$mean_Xtilde),
+                     mean(all_samples$mean_Xstar)),
+  Variance = c(var_Xbar, var_Xtilde, var_Xstar)
+)
+blue_summary
+```
+
+
+**Why this matters**: In real-world applications:
+  
+- **Medical trials**: Using $\bar{X}$ might detect a drug effect with 100 patients, while $\tilde{X}$ might need 300 patients for the same precision 
+- **Quality control**: $\bar{X}$ can detect production problems faster and more reliably 
+- **Economic forecasting**: More precise estimates lead to better policy decisions 
+
+The BLUE framework formalizes this intuition, proving mathematically that $\bar{X}$ is not just a "common sense" choice, but the **optimal** choice among all linear unbiased estimators.
+
+## The BLUE Criteria Explained
+
+Now let's formalize these intuitions. For an estimator to be considered "good" or valid, statisticians have established the **BLUE** criteria. BLUE stands for:
+  
+- **B**est: Minimum variance among all linear unbiased estimators 
+- **L**inear: The estimator is a linear combination of observations 
+- **U**nbiased: The expected value equals the true parameter 
+- **E**stimator: A function of sample data used to estimate a parameter. 
+
+Let's explore each property in detail:
+
+- **Unbiasedness**: An estimator $\hat{\theta}$ is **unbiased** if: $E[\hat{\theta}] = \theta$. This means that on average, across all possible samples, the estimator hits the true parameter value.
+- **Linearity**: An estimator is **linear** if it can be written as $\hat{\theta} = \sum_{i=1}^{n} a_i X_i$, where $a_i$ are constants (may depend on sample size but not on the data values).
+
+  - Sample mean: $\bar{X} = \frac{1}{n}\sum_{i=1}^{n} X_i$ (linear with $a_i = \frac{1}{n}$) 
+  - Weighted average: $\hat{X} = 0.5X_1 + 0.5X_3$ (linear with specific weights) 
+  - Sample median: NOT linear (depends on ordering of data). 
+
+- **Best (Minimum Variance)**: Among all linear unbiased estimators, the **best** one has the smallest variance: $\text{Var}[\hat{\theta}_{BLUE}] \leq \text{Var}[\hat{\theta}_{other}]$
+
+Lower variance means more precise estimates - the estimator's sampling distribution is more concentrated around the true value.
+
+```{r variance-comparison, echo=FALSE}
+# Demonstrate different variances
+set.seed(789)
+
+# Generate samples and calculate two unbiased estimators with different variances
+n_simulations <- 1000
+sample_size <- 20
+true_mean <- 100
+
+estimator_results <- data.frame(
+  low_variance = numeric(n_simulations),
+  high_variance = numeric(n_simulations)
+)
+
+for (i in 1:n_simulations) {
+  sample_data <- rnorm(sample_size, mean = true_mean, sd = 15)
+  
+  # Low variance estimator: sample mean (uses all data efficiently)
+  estimator_results$low_variance[i] <- mean(sample_data)
+  
+  # High variance estimator: average of only first and last observations
+  estimator_results$high_variance[i] <- (sample_data[1] + sample_data[sample_size]) / 2
+}
+
+# Create visualization
+var_comparison <- pivot_longer(estimator_results, cols = everything(),
+                               names_to = "Estimator", values_to = "Estimate")
+
+ggplot(var_comparison, aes(x = Estimate, fill = Estimator)) +
+  geom_histogram(alpha = 0.7, position = "identity", bins = 40) +
+  geom_vline(xintercept = true_mean, color = "red", linetype = "dashed", size = 1.5) +
+  scale_fill_manual(values = c("low_variance" = "blue", "high_variance" = "orange"),
+                    labels = c("High Variance", "Low Variance)")) +
+  labs(title = "Variance Comparison: Both Estimators are Unbiased but Have Different Precision",
+       subtitle = paste("True μ =", true_mean, "| Both estimators have E[θ̂] = μ"),
+       x = "Estimate Value",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+## Why These Properties Matter
+
+1. **Unbiasedness** ensures we're not systematically wrong
+2. **Linearity** makes the mathematics tractable and interpretable
+3. **Minimum variance** gives us the most precise estimates possible
+
+Together, these properties guarantee that our estimator is **reliable, consistent, and efficient** hence their Confidence Intervals will also be reliable.
+
+
+# Confidence Intervals: From Sampling Distributions to Population Inference
+
+The objective of inferential statistics is to make statements about population parameters based on sample data. Confidence intervals (CIs) are a key tool for this purpose.
+
+We've established that the sample mean $\bar{X}$ follows a sampling distribution with:
+  
+- Mean: $E[\bar{X}] = \mu$ 
+- Variance: $\text{Var}[\bar{X}] = \frac{\sigma^2}{n}$ 
+- Standard Error: $SE[\bar{X}] = \frac{\sigma}{\sqrt{n}}$  
+
+## From Sampling Distribution to Confidence Intervals
+By the Central Limit Theorem, for large n:
+$$\bar{X} \sim N\left(\mu, \frac{\sigma^2}{n}\right)$$
+
+This leads to the standardized variable:
+$$Z = \frac{\bar{X} - \mu}{\sigma/\sqrt{n}} \sim N(0, 1)$$
+
+Starting with a probability statement:
+$$P\left(-z_{\alpha/2} \leq \frac{\bar{X} - \mu}{\sigma/\sqrt{n}} \leq z_{\alpha/2}\right) = 1 - \alpha$$
+
+where $z_{\alpha/2}$ is the critical value from the standard normal distribution.
+
+Rearranging to isolate $\mu$:
+$$P\left(\bar{X} - z_{\alpha/2} \cdot \frac{\sigma}{\sqrt{n}} \leq \mu \leq \bar{X} + z_{\alpha/2} \cdot \frac{\sigma}{\sqrt{n}}\right) = 1 - \alpha$$
+
+This gives us the **confidence interval formula**:
+$$CI_{1-\alpha} = \left[\bar{X} \pm z_{\alpha/2} \cdot \frac{\sigma}{\sqrt{n}}\right]$$
+
+For a 95% confidence interval, $z_{\alpha/2} = 1.96$.
+
+## Key Insight: The Width-Precision Relationship
+
+The CI width is:
+$$\text{Width} = 2 \cdot z_{\alpha/2} \cdot \frac{\sigma}{\sqrt{n}}$$
+
+This reveals three crucial relationships: 
+  
+1. **Width ∝ σ**: Higher population variance → Wider intervals 
+2. **Width ∝ 1/√n**: Larger samples → Narrower intervals 
+3. **Width ∝ z_{α/2}**: Higher confidence → Wider intervals 
+
+## A Realistic Example: Clinical Trial for Blood Pressure Medication
+
+Let's apply confidence intervals to a realistic scenario where we need to make inferences about a population from sample data.
+
+A pharmaceutical company is testing a new blood pressure medication. They need to estimate the average reduction in systolic blood pressure (mmHg) for the entire population of patients with hypertension.
+
+```{r clinical-setup}
+# Set up the clinical trial scenario
+set.seed(2024)
+
+# True population parameters (unknown in practice)
+true_mean_reduction <- 12  # True average BP reduction in mmHg
+true_sd <- 8               # True population standard deviation
+
+# Simulate a clinical trial with 150 patients
+n_patients <- 150
+trial_data <- rnorm(n_patients, mean = true_mean_reduction, sd = true_sd)
+
+# Calculate sample statistics
+sample_mean <- mean(trial_data)
+sample_sd <- sd(trial_data)  # Using sample SD as estimate of population SD
+se <- sample_sd / sqrt(n_patients)
+```
+
+**Clinical Trial Results:**
+  
+- Sample size: `r n_patients` patients 
+- Sample mean BP reduction: `r round(sample_mean, 2)` mmHg 
+- Sample standard deviation: `r round(sample_sd, 2)` mmHg 
+- Standard error: `r round(se, 3)` mmHg 
+
+*Note: In practice, we don't know the true population mean is 12 mmHg*
+
+## Calculating the Confidence Interval
+
+Now we'll calculate a 95% confidence interval step by step:
+
+```{r ci-calculation}
+# Step 1: Choose confidence level
+confidence_level <- 0.95
+alpha <- 1 - confidence_level
+
+# Step 2: Find critical value
+# Using t-distribution since we're estimating σ with sample SD
+df <- n_patients - 1
+t_critical <- qt(1 - alpha/2, df)
+
+# For comparison, the z-critical value would be:
+z_critical <- qnorm(1 - alpha/2)
+
+# Step 3: Calculate margin of error
+margin_of_error_t <- t_critical * se
+margin_of_error_z <- z_critical * se
+
+# Step 4: Construct confidence interval
+ci_lower_t <- sample_mean - margin_of_error_t
+ci_upper_t <- sample_mean + margin_of_error_t
+
+ci_lower_z <- sample_mean - margin_of_error_z
+ci_upper_z <- sample_mean + margin_of_error_z
+```
+
+**Critical Values:**
+  
+- t-critical (df = `r df`): `r round(t_critical, 3)` 
+- z-critical (for comparison): `r round(z_critical, 3)`. 
+
+**95% Confidence Interval (using t-distribution):**
+  
+- Lower bound: `r round(ci_lower_t, 2)` mmHg 
+- Upper bound: `r round(ci_upper_t, 2)` mmHg 
+- Width: `r round(ci_upper_t - ci_lower_t, 2)` mmHg. 
+
+**Interpretation:** We are 95% confident that the true mean blood pressure reduction for all patients lies between `r round(ci_lower_t, 2)` and `r round(ci_upper_t, 2)` mmHg.
+
+## The Crucial Link: Sampling Distribution to Population Inference
+
+To understand how confidence intervals work in practice, let's simulate what would happen if we could repeat our clinical trial many times. In reality, we only conduct one trial, but this simulation helps us understand the theoretical properties of confidence intervals.
+
+```{r sampling-to-ci}
+# Simulate many samples to show the relationship
+set.seed(123)
+n_samples <- 100
+sample_means_ci <- numeric(n_samples)
+ci_lower_vals <- numeric(n_samples)
+ci_upper_vals <- numeric(n_samples)
+
+# Generate samples and calculate CIs
+for(i in 1:n_samples) {
+  # Each iteration simulates a new clinical trial
+  sample_i <- rnorm(n_patients, mean = true_mean_reduction, sd = true_sd)
+  
+  # Calculate the sample mean for this trial
+  mean_i <- mean(sample_i)
+  
+  # Calculate the standard error using this sample's SD
+  sd_i <- sd(sample_i)
+  se_i <- sd_i / sqrt(n_patients)
+  
+  # Store the sample mean
+  sample_means_ci[i] <- mean_i
+  
+  # Calculate the 95% CI for this sample
+  # CI = sample_mean ± t_critical × standard_error
+  ci_lower_vals[i] <- mean_i - t_critical * se_i
+  ci_upper_vals[i] <- mean_i + t_critical * se_i
+}
+
+# Check coverage: Does each CI contain the true mean?
+# This creates a logical vector: TRUE if CI contains μ, FALSE otherwise
+covers_true_mean <- (ci_lower_vals <= true_mean_reduction) & 
+                   (ci_upper_vals >= true_mean_reduction)
+
+# Calculate the coverage rate: proportion of CIs that contain true μ
+coverage_rate <- mean(covers_true_mean)
+```
+
+**Understanding the Coverage Rate Calculation:**
+
+The coverage rate tells us what percentage of our confidence intervals actually contain the true population parameter. Here's how we calculate it:
+
+1. **For each of the 100 simulated samples**, we:
+   - Calculate a sample mean
+   - Calculate a 95% confidence interval
+   - Check if this CI contains the true mean (12 mmHg)
+
+2. **Coverage check**: For each CI, we test if:
+   - Lower bound ≤ True mean ≤ Upper bound
+   - This gives us TRUE or FALSE for each CI
+
+3. **Coverage rate**: The proportion of CIs that contain the true mean
+   - Expected: 95% (since we're using 95% CIs)
+   - Actual: `r round(coverage_rate * 100, 1)`%
+
+```{r ci-visualization, fig.height=8, echo=FALSE}
+# Create visualization showing sampling distribution and CIs
+par(mfrow = c(2, 1))
+
+# Top panel: Sampling distribution
+hist(sample_means_ci, breaks = 20, col = "lightblue", 
+     main = "Sampling Distribution of Sample Means",
+     xlab = "Sample Mean BP Reduction (mmHg)", 
+     xlim = c(9, 15))
+abline(v = true_mean_reduction, col = "red", lwd = 3, lty = 2)
+text(true_mean_reduction + 0.3, 20, "True μ = 12", col = "red", font = 2)
+
+# Add theoretical normal curve
+x_seq <- seq(9, 15, length.out = 100)
+theoretical_se <- true_sd / sqrt(n_patients)
+lines(x_seq, 
+      dnorm(x_seq, mean = true_mean_reduction, sd = theoretical_se) * 
+      n_samples * (15-9)/20, 
+      col = "blue", lwd = 2)
+
+# Bottom panel: First 20 confidence intervals
+plot(1:20, sample_means_ci[1:20], ylim = c(9, 15),
+     pch = 19, col = ifelse(covers_true_mean[1:20], "darkgreen", "red"),
+     main = "First 20 Confidence Intervals",
+     xlab = "Sample Number", 
+     ylab = "BP Reduction (mmHg)")
+
+# Add confidence intervals
+for(i in 1:20) {
+  color <- ifelse(covers_true_mean[i], "darkgreen", "red")
+  segments(i, ci_lower_vals[i], i, ci_upper_vals[i], col = color, lwd = 2)
+}
+
+abline(h = true_mean_reduction, col = "red", lwd = 2, lty = 2)
+legend("topright", 
+       legend = c("CI contains true μ", "CI misses true μ", "True μ"),
+       col = c("darkgreen", "red", "red"),
+       lty = c(1, 1, 2),
+       lwd = 2,
+       cex = 0.8)
+
+par(mfrow = c(1, 1))
+```
+
+**Coverage Rate:** `r round(coverage_rate * 100, 1)`% of the `r n_samples` confidence intervals contain the true population mean.
+
+The confidence interval provides a range of plausible values for the population parameter based on:
+  
+1. **The sample estimate** (center of the interval) 
+2. **The sampling distribution's spread** (determines interval width) 
+3. **The desired confidence level** (affects the critical value) 
+
+
+The confidence interval width is directly proportional to the standard deviation:
+$$\text{Width} = 2 \cdot z_{\alpha/2} \cdot \frac{\sigma}{\sqrt{n}}$$
+
+Let's demonstrate this with different variance scenarios:
+
+```{r variance-effect, echo=FALSE}
+# Compare CIs with different variances
+set.seed(456)
+n_fixed <- 100
+mean_fixed <- 50
+
+# Three scenarios with different SDs
+sd_low <- 5
+sd_medium <- 15
+sd_high <- 30
+
+# Generate samples
+sample_low_var <- rnorm(n_fixed, mean = mean_fixed, sd = sd_low)
+sample_medium_var <- rnorm(n_fixed, mean = mean_fixed, sd = sd_medium)
+sample_high_var <- rnorm(n_fixed, mean = mean_fixed, sd = sd_high)
+
+# Calculate CIs
+calculate_ci <- function(data) {
+  m <- mean(data)
+  s <- sd(data)
+  se <- s / sqrt(length(data))
+  t_crit <- qt(0.975, df = length(data) - 1)
+  c(lower = m - t_crit * se, 
+    mean = m, 
+    upper = m + t_crit * se,
+    width = 2 * t_crit * se)
+}
+
+ci_low_var <- calculate_ci(sample_low_var)
+ci_medium_var <- calculate_ci(sample_medium_var)
+ci_high_var <- calculate_ci(sample_high_var)
+
+# Create comparison table
+variance_effect_table <- data.frame(
+  Scenario = c("Low Variance", "Medium Variance", "High Variance"),
+  `Population_SD` = c(sd_low, sd_medium, sd_high),
+  `CI_Lower` = c(ci_low_var["lower"], ci_medium_var["lower"], ci_high_var["lower"]),
+  `CI_Upper` = c(ci_low_var["upper"], ci_medium_var["upper"], ci_high_var["upper"]),
+  `CI_Width` = c(ci_low_var["width"], ci_medium_var["width"], ci_high_var["width"])
+)
+
+kable(variance_effect_table, digits = 2,
+      caption = "Effect of Population Variance on Confidence Interval Width",
+      col.names = c("Scenario", "σ", "Lower", "Upper", "Width")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+
+```{r variance-visualization,echo=FALSE}
+# Visualize the effect of variance on CI width
+library(ggplot2)
+
+# Create data for visualization
+ci_comparison <- data.frame(
+  Scenario = factor(c("Low σ=5", "Medium σ=15", "High σ=30"),
+                   levels = c("Low σ=5", "Medium σ=15", "High σ=30")),
+  Mean = c(ci_low_var["mean"], ci_medium_var["mean"], ci_high_var["mean"]),
+  Lower = c(ci_low_var["lower"], ci_medium_var["lower"], ci_high_var["lower"]),
+  Upper = c(ci_low_var["upper"], ci_medium_var["upper"], ci_high_var["upper"])
+)
+
+ggplot(ci_comparison, aes(x = Scenario, y = Mean)) +
+  geom_point(size = 4, color = "darkblue") +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), 
+                width = 0.2, size = 1.2,
+                color = c("darkgreen", "orange", "red")) +
+  geom_hline(yintercept = mean_fixed, linetype = "dashed", 
+             color = "gray50", alpha = 0.7) +
+  labs(title = "Impact of Variance on Confidence Interval Width",
+       subtitle = "Same sample size (n=100), different population variances",
+       x = "Variance Scenario",
+       y = "Estimate with 95% CI") +
+  theme_minimal() +
+  annotate("text", x = 3.5, y = mean_fixed, 
+           label = "True μ = 50", 
+           hjust = 1, color = "gray50")
+```
+
+**Key Observation:** As variance increases, the confidence interval becomes wider, making our estimates less precise. This is why reducing measurement error and controlling for sources of variation is crucial in research design.
+
+## Effects of Bias on Confidence Intervals
+
+If an estimator is biased, the confidence interval will be systematically shifted away from the true parameter:
+
+```{r bias-effect, echo=FALSE}
+# Demonstrate effect of bias on CI coverage
+set.seed(789)
+n_simulations <- 1000
+n_sample <- 50
+true_mean <- 100
+true_sd <- 20
+
+# Storage for results
+unbiased_cis <- matrix(NA, n_simulations, 2)
+biased_cis <- matrix(NA, n_simulations, 2)
+
+for(i in 1:n_simulations) {
+  # Generate sample
+  sample_data <- rnorm(n_sample, mean = true_mean, sd = true_sd)
+  
+  # Unbiased estimator (sample mean)
+  mean_unbiased <- mean(sample_data)
+  se <- sd(sample_data) / sqrt(n_sample)
+  t_crit <- qt(0.975, df = n_sample - 1)
+  
+  unbiased_cis[i, ] <- c(mean_unbiased - t_crit * se,
+                         mean_unbiased + t_crit * se)
+  
+  # Biased estimator (systematically underestimates by 10%)
+  mean_biased <- mean(sample_data) * 0.9
+  # Note: Using same SE formula, but estimator is biased
+  biased_cis[i, ] <- c(mean_biased - t_crit * se,
+                      mean_biased + t_crit * se)
+}
+
+# Calculate coverage rates
+coverage_unbiased <- mean((unbiased_cis[, 1] <= true_mean) & 
+                         (unbiased_cis[, 2] >= true_mean))
+coverage_biased <- mean((biased_cis[, 1] <= true_mean) & 
+                       (biased_cis[, 2] >= true_mean))
+
+# Calculate average CI centers
+center_unbiased <- mean((unbiased_cis[, 1] + unbiased_cis[, 2]) / 2)
+center_biased <- mean((biased_cis[, 1] + biased_cis[, 2]) / 2)
+```
+
+
+```{r bias-visualization, fig.height=7, echo=FALSE}
+# Create visualization showing bias effect
+set.seed(999)
+
+# Sample 50 CIs for visualization
+sample_indices <- sample(1:n_simulations, 50)
+
+# Create plot data
+plot_data <- data.frame(
+  Index = rep(1:50, 2),
+  Type = rep(c("Unbiased", "Biased"), each = 50),
+  Lower = c(unbiased_cis[sample_indices, 1], 
+           biased_cis[sample_indices, 1]),
+  Upper = c(unbiased_cis[sample_indices, 2], 
+           biased_cis[sample_indices, 2]),
+  Contains = c((unbiased_cis[sample_indices, 1] <= true_mean) & 
+              (unbiased_cis[sample_indices, 2] >= true_mean),
+              (biased_cis[sample_indices, 1] <= true_mean) & 
+              (biased_cis[sample_indices, 2] >= true_mean))
+)
+
+ggplot(plot_data, aes(x = Index, y = (Lower + Upper)/2)) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper, 
+                   color = Contains), 
+               width = 0.3, alpha = 0.7) +
+  geom_hline(yintercept = true_mean, 
+            linetype = "dashed", color = "red", size = 1) +
+  facet_wrap(~ Type, ncol = 1) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "darkgreen"),
+                    labels = c("Misses μ", "Contains μ")) +
+  labs(title = "Effect of Bias on Confidence Interval Coverage",
+       subtitle = paste("True μ =", true_mean, "| 50 random CIs shown"),
+       x = "Sample Number",
+       y = "Confidence Interval",
+       color = "Coverage") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+
+## Summary: From Theory to Practice
+
+The journey from sampling distributions to confidence intervals reveals the elegant connection between theoretical statistics and practical inference:
+  
+1. **Sampling distributions** tell us how our estimator varies across all possible samples 
+2. **The BLUE properties** ensure we're using the optimal estimator 
+3. **Confidence intervals** translate this variability into a range of plausible values for the population parameter. 
+
+The key relationship:
+$$\text{Narrower Sampling Distribution} \rightarrow \text{More Precise CI} \rightarrow \text{Better Inference}$$
+
+This is achieved by:
+  
+- Using unbiased estimators (correct centering) 
+- Minimizing variance (BLUE property) 
+- Increasing sample size (reduces SE) 
+
+# Summary and Key Takeaways
+
+1. **Inferential Statistics** enables us to:
+  
+  - Make conclusions about populations from samples 
+  - Quantify uncertainty in our estimates 
+  - Test hypotheses about population parameters 
+
+2. **Sampling Distributions** reveal:
+  
+  - How estimators behave across all possible samples 
+  - The precision and reliability of our estimates 
+  - The theoretical foundation for confidence intervals 
+
+3. **BLUE Properties** ensure good estimators:
+  
+  - **Best**: Minimum variance among competitors 
+  - **Linear**: Mathematical tractability and interpretability 
+  - **Unbiased**: No systematic error 
+  - **Estimator**: A rule for calculating estimates 
+
+4. **The Sample Mean X̄ is BLUE** because:
+  
+  - It's unbiased: $E[\bar{X}] = \mu$ 
+  - It's linear: $\bar{X} = \frac{1}{n}\sum X_i$ 
+  - It has minimum variance among linear unbiased estimators 
+  - Proven both theoretically (Lagrange optimization) and empirically (simulation). 
+
+
+> "The sample mean is not just a convenient choice—it's the mathematically optimal estimator for the population mean under the BLUE framework."
+
+This fundamental result underpins much of classical statistics and provides the foundation for:
+  
+- Hypothesis testing (t-tests, ANOVA) 
+- Confidence intervals 
+- Regression analysis 
+- Quality control 
+- Survey sampling. 
+
+Understanding why X̄ is BLUE helps us appreciate the deep mathematical elegance underlying even the simplest statistical procedures.
+

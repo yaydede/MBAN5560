@@ -1,0 +1,1000 @@
+---
+title: "Prediction: From Regression to Classification"
+subtitle: "MBAN 5520 - Train-Test Splits, Overfitting, and Threshold Optimization"
+author: "Dr. Aydede"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+library(patchwork)
+library(ISLR2)
+```
+
+
+
+In previous weeks, we focused on **estimation**:
+
+- What is the relationship between X and Y?
+- Is the effect statistically significant?
+- How do we interpret coefficients?
+
+Now we shift to **prediction**:
+
+- Given new observations, can we accurately predict outcomes?
+- How do we evaluate prediction performance?
+- How much uncertainty is there in our predictions?
+  
+**Two Key Challenges**
+
+When moving from estimation to prediction, we face two fundamental challenges:
+
+1. **Overfitting**: Models that fit the training data too well may not generalize to new data
+2. **Uncertainty**: Prediction performance varies depending on which data we use
+
+We'll explore these concepts first with **regression** (continuous outcomes), then with **classification** (binary outcomes).
+
+# Part 1: Prediction in Regression
+
+## Data: Ames Housing
+
+Let's work with the Ames Housing dataset to predict house sale prices.
+
+```{r load-ames}
+ames <- read.csv("~/Dropbox/Documents/Courses/MBAN5520/Week5/AmesHousing.csv")
+
+# Select key variables for a simple model
+ames_clean <- ames %>%
+  select(SalePrice, Gr.Liv.Area, Overall.Qual, Year.Built, Total.Bsmt.SF, Garage.Area) %>%
+  na.omit()
+
+# Examine the data
+str(ames_clean)
+
+# Summary statistics
+summary(ames_clean)
+```
+
+```{r visualize-ames}
+# Visualize the relationship between living area and sale price
+ggplot(ames_clean, aes(x = Gr.Liv.Area, y = SalePrice)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "House Sale Price vs Living Area",
+    subtitle = "Ames Housing Dataset",
+    x = "Above Grade Living Area (sq ft)",
+    y = "Sale Price"
+  ) +
+  theme_minimal()
+```
+
+## The Overfitting Problem
+
+### What is Overfitting?
+
+When we fit a model on data and evaluate it on the **same data**, we get overly optimistic results. The model has "memorized" the training data, including its noise and peculiarities.
+
+**Analogy**: Imagine studying for an exam by memorizing all the practice questions. You'd do perfectly on those exact questions, but might struggle with new questions testing the same concepts.
+
+### Demonstration: In-Sample vs Out-of-Sample
+
+Let's fit a model and compare performance on training vs test data:
+
+```{r overfit-demo}
+# Set seed for reproducibility
+set.seed(123)
+
+# Create 80/20 split
+n <- nrow(ames_clean)
+train_idx <- sample(1:n, size = floor(0.8 * n), replace = FALSE)
+
+train_data <- ames_clean[train_idx, ]
+test_data <- ames_clean[-train_idx, ]
+```
+
+```{r, echo=FALSE}
+# Check split sizes
+split_summary <- data.frame(
+  Dataset = c("Training", "Test", "Total"),
+  N = c(nrow(train_data), nrow(test_data), n),
+  Proportion = c(
+    paste0(round(nrow(train_data)/n * 100, 1), "%"),
+    paste0(round(nrow(test_data)/n * 100, 1), "%"),
+    "100%"
+  )
+)
+
+kable(
+  split_summary,
+  caption = "Train-Test Split Summary"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r fit-model}
+# Fit model on TRAINING data only
+model <- lm(SalePrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+              Total.Bsmt.SF + Garage.Area, data = train_data)
+
+# Predict on TRAINING data (in-sample)
+train_pred <- predict(model, newdata = train_data)
+
+# Predict on TEST data (out-of-sample)
+test_pred <- predict(model, newdata = test_data)
+```
+
+### Visualizing Predictions: Y vs Ŷ
+
+```{r y-vs-yhat, fig.width=12, fig.height=5, echo=FALSE}
+# Create data frames for plotting
+train_plot_data <- data.frame(
+  Actual = train_data$SalePrice,
+  Predicted = train_pred,
+  Type = "Training (In-Sample)"
+)
+
+test_plot_data <- data.frame(
+  Actual = test_data$SalePrice,
+  Predicted = test_pred,
+  Type = "Test (Out-of-Sample)"
+)
+
+# In-sample plot
+p1 <- ggplot(train_plot_data, aes(x = Actual, y = Predicted)) +
+  geom_point(alpha = 0.5, color = "#e74c3c") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black", size = 1) +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Training Data (In-Sample)",
+    x = "Actual Sale Price",
+    y = "Predicted Sale Price"
+  ) +
+  theme_minimal() +
+  coord_equal()
+
+# Out-of-sample plot
+p2 <- ggplot(test_plot_data, aes(x = Actual, y = Predicted)) +
+  geom_point(alpha = 0.5, color = "#3498db") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black", size = 1) +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Test Data (Out-of-Sample)",
+    x = "Actual Sale Price",
+    y = "Predicted Sale Price"
+  ) +
+  theme_minimal() +
+  coord_equal()
+
+# Combine plots side by side
+p1 + p2 + plot_annotation(
+  title = "Actual vs Predicted Sale Prices",
+  subtitle = "Points closer to the dashed line indicate better predictions"
+)
+```
+
+### Measuring Prediction Error: RMSE
+
+We use **Root Mean Squared Error (RMSE)** to measure prediction accuracy:
+
+$$\text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}$$
+
+RMSE has the same units as the outcome variable (dollars), making it interpretable.
+
+```{r calc-rmse}
+# Function to calculate RMSE
+calc_rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+# Calculate RMSE for training and test data
+rmse_train <- calc_rmse(train_data$SalePrice, train_pred)
+rmse_test <- calc_rmse(test_data$SalePrice, test_pred)
+```
+
+```{r, echo=FALSE}
+# Create comparison table
+rmse_comparison <- data.frame(
+  Dataset = c("Training (In-Sample)", "Test (Out-of-Sample)"),
+  RMSE_Formatted = paste0("$", format(round(c(rmse_train, rmse_test)), big.mark = ","))
+)
+
+kable(
+  rmse_comparison,
+  caption = "In-Sample vs Out-of-Sample Prediction Error",
+  col.names = c("Dataset", "RMSE (Formatted)"),
+  digits = 0
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Key Insight**: The training RMSE is lower than the test RMSE. This gap represents **overfitting** - the model has learned patterns specific to the training data that don't generalize.
+
+### Why Overfitting Happens
+
+```{r overfit-explanation, echo=FALSE}
+overfit_table <- data.frame(
+  Aspect = c(
+    "What it measures",
+    "Model has 'seen' this data",
+    "Includes noise fitting",
+    "Reliable for new predictions"
+  ),
+  `Training_Error` = c(
+    "How well model fits training data",
+    "Yes",
+    "Yes - artificially low",
+    "No - overly optimistic"
+  ),
+  `Test_Error` = c(
+    "How well model generalizes",
+    "No - completely new data",
+    "No - honest evaluation",
+    "Yes - realistic expectations"
+  )
+)
+
+kable(
+  overfit_table,
+  caption = "Training Error vs Test Error",
+  col.names = c("Aspect", "Training Error", "Test Error")
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Uncertainty in Predictions
+
+A single train-test split gives us **one** estimate of prediction performance. But this estimate depends on which observations ended up in training vs test.
+
+**Question**: How much does our RMSE vary across different random splits?
+
+### The Solution: Multiple Splits
+
+We'll run 100 different train-test splits and examine the distribution of test RMSE:
+
+```{r multiple-splits-regression}
+# Set seed for reproducibility
+set.seed(2024)
+
+# Parameters
+n_splits <- 100
+n <- nrow(ames_clean)
+
+# Storage for results
+regression_results <- data.frame(
+  split = integer(),
+  rmse_train = numeric(),
+  rmse_test = numeric()
+)
+
+# Loop over 100 different splits
+for (s in 1:n_splits) {
+  
+  # Create random 80/20 split
+  train_idx <- sample(1:n, size = floor(0.8 * n), replace = FALSE)
+  train_data <- ames_clean[train_idx, ]
+  test_data <- ames_clean[-train_idx, ]
+  
+  # Fit model on training data
+  model <- lm(SalePrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+                Total.Bsmt.SF + Garage.Area, data = train_data)
+  
+  # Predict on both datasets
+  train_pred <- predict(model, newdata = train_data)
+  test_pred <- predict(model, newdata = test_data)
+  
+  # Calculate RMSE
+  regression_results <- rbind(regression_results, data.frame(
+    split = s,
+    rmse_train = calc_rmse(train_data$SalePrice, train_pred),
+    rmse_test = calc_rmse(test_data$SalePrice, test_pred)
+  ))
+}
+
+# Display first few results
+kable(
+  head(regression_results, 10),
+  caption = "RMSE Results from First 10 Splits",
+  digits = 0,
+  row.names = FALSE
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Distribution of Prediction Error
+
+```{r rmse-distribution, echo=FALSE}
+# Reshape data for plotting
+rmse_long <- regression_results %>%
+  pivot_longer(
+    cols = c(rmse_train, rmse_test),
+    names_to = "Type",
+    values_to = "RMSE"
+  ) %>%
+  mutate(Type = ifelse(Type == "rmse_train", "Training", "Test"))
+
+# Boxplot comparison
+ggplot(rmse_long, aes(x = Type, y = RMSE, fill = Type)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.3, size = 1) +
+  scale_fill_manual(values = c("Training" = "#e74c3c", "Test" = "#3498db")) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Distribution of RMSE Across 100 Train-Test Splits",
+    subtitle = "Test error is consistently higher than training error",
+    x = "",
+    y = "Root Mean Squared Error (RMSE)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+```{r rmse-summary, echo=FALSE}
+# Calculate summary statistics
+rmse_summary <- rmse_long %>%
+  group_by(Type) %>%
+  summarise(
+    Mean = mean(RMSE),
+    SD = sd(RMSE),
+    Min = min(RMSE),
+    Q1 = quantile(RMSE, 0.25),
+    Median = median(RMSE),
+    Q3 = quantile(RMSE, 0.75),
+    Max = max(RMSE),
+    .groups = "drop"
+  )
+
+kable(
+  rmse_summary,
+  caption = "Summary Statistics: RMSE Across 100 Splits",
+  digits = 0
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Histogram of Test RMSE
+
+```{r test-rmse-histogram, echo=FALSE}
+# Histogram of test RMSE
+ggplot(regression_results, aes(x = rmse_test)) +
+  geom_histogram(bins = 20, fill = "#3498db", color = "white", alpha = 0.7) +
+  geom_vline(xintercept = mean(regression_results$rmse_test), 
+             color = "red", linetype = "dashed", size = 1.2) +
+  annotate("text", x = mean(regression_results$rmse_test) + 500, 
+           y = 15, label = paste0("Mean: $", format(round(mean(regression_results$rmse_test)), big.mark = ",")),
+           color = "red", size = 4, hjust = 0) +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Distribution of Test RMSE Across 100 Splits",
+    subtitle = "Prediction performance has variability!",
+    x = "Test RMSE",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
+And we can show it in a plot with 95% confidence interval:
+
+```{r test-rmse-dotplot}
+# Calculate mean and 95% CI bounds
+mean_rmse <- mean(regression_results$rmse_test)
+sd_rmse <- sd(regression_results$rmse_test)
+lower_ci <- mean_rmse - 1.96 * sd_rmse
+upper_ci <- mean_rmse + 1.96 * sd_rmse
+
+# Plot: X = split number, Y = RMSE
+ggplot(regression_results, aes(x = split, y = rmse_test)) +
+  geom_point(alpha = 0.6, color = "#3498db", size = 2) +
+  geom_hline(yintercept = mean_rmse, color = "red", linetype = "dotted", size = 1.2) +
+  geom_hline(yintercept = upper_ci, color = "darkgray", linetype = "dashed", size = 0.8) +
+  geom_hline(yintercept = lower_ci, color = "darkgray", linetype = "dashed", size = 0.8) +
+  annotate("text", x = 5, y = mean_rmse + 500, 
+           label = paste0("Mean: $", format(round(mean_rmse), big.mark = ",")),
+           color = "red", size = 4, hjust = 0) +
+  annotate("text", x = 5, y = upper_ci + 500, 
+           label = paste0("Upper 95%: $", format(round(upper_ci), big.mark = ",")),
+           color = "darkgray", size = 3, hjust = 0) +
+  annotate("text", x = 5, y = lower_ci - 500, 
+           label = paste0("Lower 95%: $", format(round(lower_ci), big.mark = ",")),
+           color = "darkgray", size = 3, hjust = 0) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Test RMSE Across 100 Splits with 95% Bounds",
+    subtitle = "Each point represents a different train-test split",
+    x = "Split Number",
+    y = "Test RMSE"
+  ) +
+  theme_minimal()
+```
+
+
+
+```{r regression-takeaways, echo=FALSE}
+takeaways <- data.frame(
+  Concept = c("Overfitting", "Train-Test Split", "Multiple Splits"),
+  Description = c(
+    "Training error < Test error because model memorizes training data",
+    "Use separate data for fitting and evaluation",
+    "Single split gives one estimate; multiple splits show variability"
+  ),
+  Implication = c(
+    "Always evaluate on data the model hasn't seen",
+    "80/20 split is a common choice",
+    "Report mean AND standard deviation of metrics"
+  )
+)
+
+kable(
+  takeaways,
+  caption = "Key Concepts in Regression Prediction"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+# Part 2: Prediction in Classification
+
+Now let's apply these concepts to **classification** problems where the outcome is binary (0 or 1). Classification adds an extra challenge: we need to convert predicted probabilities into binary predictions using a **threshold**.
+
+## Data: Credit Card Default
+
+```{r load-default}
+# Load the Default dataset from ISLR2
+data("Default")
+
+# Create binary variables for modeling
+Default <- Default %>%
+  mutate(
+    default_binary = ifelse(default == "Yes", 1, 0),
+    student_binary = ifelse(student == "Yes", 1, 0)
+  )
+
+# Check class balance
+default_table <- table(Default$default_binary)
+default_props <- prop.table(default_table)
+
+kable(
+  data.frame(
+    Default = c("No (0)", "Yes (1)"),
+    Count = as.numeric(default_table),
+    Proportion = paste0(round(as.numeric(default_props) * 100, 2), "%")
+  ),
+  caption = "Distribution of Default Status",
+  align = "lcc"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Critical Observation**: The dataset is **highly imbalanced** - only `r round(mean(Default$default_binary) * 100, 2)`% of customers default. This imbalance has major implications for prediction.
+
+```{r visualize-default}
+# Visualize the relationship between balance and default
+ggplot(Default, aes(x = balance, y = default_binary)) +
+  geom_jitter(alpha = 0.3, height = 0.05, color = "steelblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "red", linetype = "dashed") +
+  geom_hline(yintercept = 0.5, linetype = "dotted", color = "darkgreen", size = 1) +
+  annotate("text", x = 500, y = 0.55, label = "Threshold = 0.5", 
+           color = "darkgreen", size = 4) +
+  labs(
+    title = "Credit Card Balance vs Default Status",
+    subtitle = "Red dashed line shows LPM fit; notice most predictions are below 0.5!",
+    x = "Credit Card Balance ($)",
+    y = "Default (0 = No, 1 = Yes)"
+  ) +
+  theme_minimal()
+```
+
+## The Threshold Problem with Imbalanced Data
+
+### Why the Default Threshold (0.5) Fails
+
+With classification, we need to convert probability estimates into binary predictions. The standard approach is:
+
+$$\hat{Y}_i = \begin{cases} 
+1 & \text{if } \hat{p}_i \geq 0.5 \\
+0 & \text{if } \hat{p}_i < 0.5
+\end{cases}$$
+
+But with imbalanced data, this fails badly!
+
+```{r threshold-problem}
+# Fit LPM on all data
+lpm_model <- lm(default_binary ~ balance + income + student_binary, data = Default)
+
+# Get predictions
+Default$predicted_prob <- predict(lpm_model)
+
+# Visualize the distribution of predicted probabilities
+ggplot(Default, aes(x = predicted_prob, fill = factor(default_binary))) +
+  geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "red", size = 1.2) +
+  annotate("text", x = 0.52, y = 2000, label = "Threshold = 0.5", 
+           color = "red", hjust = 0, size = 4, fontface = "bold") +
+  scale_fill_manual(values = c("0" = "#3498db", "1" = "#e74c3c"),
+                    labels = c("No Default", "Default")) +
+  labs(
+    title = "Distribution of Predicted Probabilities",
+    subtitle = "Almost all predictions are below 0.5!",
+    x = "Predicted Probability",
+    y = "Count",
+    fill = "Actual Status"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### The Disastrous Results with Threshold = 0.5
+
+```{r disaster-threshold}
+# Function to calculate classification metrics
+calc_metrics <- function(actual, predicted) {
+  TP <- sum(actual == 1 & predicted == 1)
+  TN <- sum(actual == 0 & predicted == 0)
+  FP <- sum(actual == 0 & predicted == 1)
+  FN <- sum(actual == 1 & predicted == 0)
+  
+  accuracy <- (TP + TN) / (TP + TN + FP + FN)
+  specificity <- ifelse((TN + FP) > 0, TN / (TN + FP), 0)
+  precision <- ifelse((TP + FP) > 0, TP / (TP + FP), 0)
+  recall <- ifelse((TP + FN) > 0, TP / (TP + FN), 0)
+  f1 <- ifelse((precision + recall) > 0, 
+               2 * precision * recall / (precision + recall), 0)
+  
+  return(data.frame(
+    Accuracy = accuracy,
+    Specificity = specificity,
+    Precision = precision,
+    Recall = recall,
+    F1 = f1
+  ))
+}
+
+# Classify with threshold = 0.5
+Default$pred_class_05 <- ifelse(Default$predicted_prob >= 0.5, 1, 0)
+
+# Calculate metrics
+metrics_05 <- calc_metrics(Default$default_binary, Default$pred_class_05)
+
+kable(
+  metrics_05,
+  caption = "Classification Metrics with Threshold = 0.5",
+  digits = 4
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Analysis of Results**:
+
+- **Accuracy = `r round(metrics_05$Accuracy, 4)`**: Looks great! But this is misleading...
+- **Specificity = 1**: We correctly identify all non-defaults (because we predict everyone as non-default!)
+- **Precision = 0**: We predict zero defaults
+- **Recall = 0**: We catch zero of the actual defaults
+- **F1 = 0**: The model is useless for identifying defaults!
+
+**The "accuracy paradox"**: High accuracy can be achieved by simply predicting the majority class.
+
+## The Classification Threshold Solution
+
+### Finding Better Thresholds
+
+```{r calc-metrics-threshold}
+# Function to calculate metrics at a specific threshold
+calc_metrics_at_threshold <- function(actual, predicted_prob, threshold) {
+  predicted_class <- ifelse(predicted_prob >= threshold, 1, 0)
+  
+  TP <- sum(actual == 1 & predicted_class == 1)
+  TN <- sum(actual == 0 & predicted_class == 0)
+  FP <- sum(actual == 0 & predicted_class == 1)
+  FN <- sum(actual == 1 & predicted_class == 0)
+  
+  accuracy <- (TP + TN) / (TP + TN + FP + FN)
+  specificity <- ifelse((TN + FP) > 0, TN / (TN + FP), 0)
+  precision <- ifelse((TP + FP) > 0, TP / (TP + FP), 0)
+  recall <- ifelse((TP + FN) > 0, TP / (TP + FN), 0)
+  f1 <- ifelse((precision + recall) > 0, 
+               2 * precision * recall / (precision + recall), 0)
+  
+  return(data.frame(
+    Threshold = threshold,
+    Accuracy = accuracy,
+    Specificity = specificity,
+    Precision = precision,
+    Recall = recall,
+    F1 = f1
+  ))
+}
+
+# Test a range of thresholds
+thresholds <- seq(0.01, 0.50, by = 0.01)
+
+# Calculate metrics for each threshold
+threshold_results <- do.call(rbind, lapply(thresholds, function(t) {
+  calc_metrics_at_threshold(Default$default_binary, Default$predicted_prob, t)
+}))
+
+# Reshape for plotting
+threshold_long <- threshold_results %>%
+  pivot_longer(
+    cols = c(Accuracy, Specificity, Precision, Recall, F1),
+    names_to = "Metric",
+    values_to = "Value"
+  )
+
+ggplot(threshold_long, aes(x = Threshold, y = Value, color = Metric)) +
+  geom_line(size = 1.2) +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Classification Metrics vs Threshold",
+    subtitle = "Different metrics are optimized at different thresholds",
+    x = "Classification Threshold",
+    y = "Metric Value",
+    color = "Metric"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Optimal Thresholds for Each Metric
+
+```{r optimal-thresholds}
+optimal_summary <- data.frame(
+  Metric = c("Accuracy", "Specificity", "Precision", "F1-Score"),
+  `Optimal_Threshold` = c(
+    threshold_results$Threshold[which.max(threshold_results$Accuracy)],
+    threshold_results$Threshold[which.max(threshold_results$Specificity)],
+    threshold_results$Threshold[which.max(threshold_results$Precision)],
+    threshold_results$Threshold[which.max(threshold_results$F1)]
+  ),
+  `Best_Value` = c(
+    max(threshold_results$Accuracy),
+    max(threshold_results$Specificity),
+    max(threshold_results$Precision),
+    max(threshold_results$F1)
+  )
+)
+
+kable(
+  optimal_summary,
+  caption = "Optimal Thresholds for Each Metric",
+  col.names = c("Metric", "Optimal Threshold", "Best Value"),
+  digits = 4
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Multiple Splits with Threshold Optimization
+
+For classification, we need **two loops**:
+
+1. **Outer loop**: Different train-test splits (like regression)
+2. **Inner loop**: Different thresholds to find the optimal one
+
+```{r nested-loop-diagram, echo=FALSE}
+loop_diagram <- data.frame(
+  Level = c("Outer Loop", "Inner Loop", "Output"),
+  Description = c(
+    "100 different 80/20 train-test splits",
+    "For each split: test thresholds 0.01 to 0.50",
+    "For each split: optimal threshold and performance"
+  ),
+  Purpose = c(
+    "Assess variability across data splits",
+    "Find best threshold for each metric",
+    "Distribution of optimal thresholds and metrics"
+  )
+)
+
+kable(
+  loop_diagram,
+  caption = "Nested Loop Structure for Classification"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r multiple-splits-classification}
+# Set seed for reproducibility
+set.seed(2024)
+
+# Parameters
+n_splits <- 100
+n <- nrow(Default)
+thresholds <- seq(0.01, 0.50, by = 0.01)
+
+# Storage for results
+classification_results <- data.frame(
+  split = integer(),
+  optimal_threshold_acc = numeric(),
+  optimal_threshold_spec = numeric(),
+  optimal_threshold_prec = numeric(),
+  optimal_threshold_f1 = numeric(),
+  best_accuracy = numeric(),
+  best_specificity = numeric(),
+  best_precision = numeric(),
+  best_f1 = numeric()
+)
+
+# Outer loop: 100 different splits
+for (s in 1:n_splits) {
+  
+  # Create random 80/20 split
+  train_idx <- sample(1:n, size = floor(0.8 * n), replace = FALSE)
+  train_data <- Default[train_idx, ]
+  test_data <- Default[-train_idx, ]
+  
+  # Fit LPM on training data
+  lpm_model <- lm(default_binary ~ balance + income + student_binary, 
+                  data = train_data)
+  
+  # Predict on test data
+  test_pred <- predict(lpm_model, newdata = test_data)
+  
+  # Inner loop: find optimal threshold for each metric
+  split_metrics <- do.call(rbind, lapply(thresholds, function(t) {
+    calc_metrics_at_threshold(test_data$default_binary, test_pred, t)
+  }))
+  
+  # Find optimal thresholds
+  classification_results <- rbind(classification_results, data.frame(
+    split = s,
+    optimal_threshold_acc = split_metrics$Threshold[which.max(split_metrics$Accuracy)],
+    optimal_threshold_spec = split_metrics$Threshold[which.max(split_metrics$Specificity)],
+    optimal_threshold_prec = split_metrics$Threshold[which.max(split_metrics$Precision)],
+    optimal_threshold_f1 = split_metrics$Threshold[which.max(split_metrics$F1)],
+    best_accuracy = max(split_metrics$Accuracy),
+    best_specificity = max(split_metrics$Specificity),
+    best_precision = max(split_metrics$Precision),
+    best_f1 = max(split_metrics$F1)
+  ))
+}
+
+# Display first few results
+kable(
+  head(classification_results, 10),
+  caption = "Results from First 10 Splits",
+  digits = 4,
+  row.names = FALSE
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Distribution of Optimal Thresholds
+
+```{r threshold-distributions}
+# Reshape threshold data for plotting
+threshold_dist <- classification_results %>%
+  select(split, starts_with("optimal_threshold")) %>%
+  pivot_longer(
+    cols = -split,
+    names_to = "Metric",
+    values_to = "Optimal_Threshold",
+    names_prefix = "optimal_threshold_"
+  ) %>%
+  mutate(Metric = case_when(
+    Metric == "acc" ~ "Accuracy",
+    Metric == "spec" ~ "Specificity",
+    Metric == "prec" ~ "Precision",
+    Metric == "f1" ~ "F1-Score"
+  ))
+
+ggplot(threshold_dist, aes(x = Metric, y = Optimal_Threshold, fill = Metric)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.3, size = 1) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Distribution of Optimal Thresholds Across 100 Splits",
+    subtitle = "Different metrics require different thresholds",
+    x = "Metric",
+    y = "Optimal Threshold"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Summary Statistics for Optimal Thresholds
+
+```{r threshold-summary}
+threshold_summary <- threshold_dist %>%
+  group_by(Metric) %>%
+  summarise(
+    Mean = mean(Optimal_Threshold),
+    SD = sd(Optimal_Threshold),
+    Min = min(Optimal_Threshold),
+    Median = median(Optimal_Threshold),
+    Max = max(Optimal_Threshold),
+    .groups = "drop"
+  )
+
+kable(
+  threshold_summary,
+  caption = "Summary: Optimal Thresholds Across 100 Splits",
+  digits = 4
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Distribution of Best Metric Values
+
+```{r metric-distributions}
+# Reshape metric data for plotting
+metric_dist <- classification_results %>%
+  select(split, starts_with("best_")) %>%
+  pivot_longer(
+    cols = -split,
+    names_to = "Metric",
+    values_to = "Best_Value",
+    names_prefix = "best_"
+  ) %>%
+  mutate(Metric = case_when(
+    Metric == "accuracy" ~ "Accuracy",
+    Metric == "specificity" ~ "Specificity",
+    Metric == "precision" ~ "Precision",
+    Metric == "f1" ~ "F1-Score"
+  ))
+
+ggplot(metric_dist, aes(x = Metric, y = Best_Value, fill = Metric)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.3, size = 1) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    title = "Distribution of Best Metric Values Across 100 Splits",
+    subtitle = "Performance varies depending on the random split",
+    x = "Metric",
+    y = "Best Value (at Optimal Threshold)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ylim(0, 1)
+```
+
+### Summary Statistics for Best Metrics
+
+```{r metric-summary}
+metric_summary <- metric_dist %>%
+  group_by(Metric) %>%
+  summarise(
+    Mean = mean(Best_Value),
+    SD = sd(Best_Value),
+    Min = min(Best_Value),
+    Median = median(Best_Value),
+    Max = max(Best_Value),
+    .groups = "drop"
+  )
+
+kable(
+  metric_summary,
+  caption = "Summary: Best Metric Values Across 100 Splits",
+  digits = 4
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+# Summary and Key Takeaways
+
+## Comparing Regression vs Classification
+
+```{r comparison-table, echo=FALSE}
+comparison <- data.frame(
+  Aspect = c(
+    "Outcome type",
+    "Prediction output",
+    "Error metric",
+    "Extra challenge",
+    "Number of loops needed"
+  ),
+  Regression = c(
+    "Continuous (e.g., price)",
+    "Predicted value",
+    "RMSE, MAE, R²",
+    "None - direct comparison",
+    "1 loop (train-test splits)"
+  ),
+  Classification = c(
+    "Binary (0 or 1)",
+    "Predicted probability",
+    "Accuracy, Precision, Recall, F1",
+    "Threshold selection",
+    "2 loops (splits + thresholds)"
+  )
+)
+
+kable(
+  comparison,
+  caption = "Regression vs Classification Prediction"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Key Concepts Learned
+
+### 1. Overfitting
+
+- Training error < Test error because model memorizes training data
+- Always evaluate on data the model hasn't seen
+- The gap between training and test error indicates overfitting
+
+### 2. Train-Test Split
+
+- Use 80/20 (or 70/30) split
+- Training set: fit the model
+- Test set: evaluate performance
+
+### 3. Uncertainty in Predictions
+
+- A single split gives one estimate
+- Multiple splits show variability
+- Report mean AND standard deviation
+
+### 4. Classification Threshold
+
+- Default 0.5 fails with imbalanced data
+- Different metrics optimized at different thresholds
+- Use inner loop to find optimal threshold
+
+## Practical Recommendations
+
+```{r recommendations, echo=FALSE}
+recommendations <- data.frame(
+  Task = c(
+    "Model evaluation",
+    "Reporting results",
+    "Threshold selection",
+    "Imbalanced data"
+  ),
+  Recommendation = c(
+    "Always use out-of-sample (test) evaluation",
+    "Run 100 splits; report mean ± SD",
+    "Optimize threshold for the metric that matters",
+    "Don't use accuracy alone; focus on F1, precision, or recall"
+  )
+)
+
+kable(
+  recommendations,
+  caption = "Practical Recommendations for Prediction"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Connection to Future Topics
+
+| Topic | Connection |
+|-------|------------|
+| **Cross-Validation** | More efficient use of data than simple splits |
+| **Regularization** | Reduce overfitting by penalizing model complexity |
+| **ROC Curves** | Systematic way to compare across all thresholds |
+| **Logistic Regression** | Better probability estimates for classification |
+
+---
+
+## R Session Information
+
+```{r session-info}
+sessionInfo()
+```

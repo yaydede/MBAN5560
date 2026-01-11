@@ -1,0 +1,949 @@
+---
+title: "Introduction to Gradient Descent: An Optimization Journey"
+subtitle: "From Mathematical Theory to Practical Implementation"
+author: "Dr. Aydede"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+library(patchwork)
+library(plotly)
+```
+
+# Introduction: Why Gradient Descent?
+
+## The Optimization Challenge
+
+In Week 1, we learned three approaches to finding regression coefficients:
+
+1. **Probabilistic Approach**: Using conditional expectations
+2. **Covariance Approach**: Using the orthogonality condition
+3. **Optimization Approach**: Minimizing the Residual Sum of Squares (RSS)
+
+For simple linear regression, we derived the closed-form solution:
+$$\beta = (X^T X)^{-1} X^T y$$
+
+But what happens when:
+  
+- The matrix $(X^T X)$ is too large to invert efficiently? 
+- We have millions of parameters (like in neural networks)? 
+- The objective function has no closed-form solution? 
+- We want to optimize non-linear models?  
+
+This is where **gradient descent** becomes essential.
+
+## What is Gradient Descent?
+
+**Gradient descent** is an iterative optimization algorithm that finds the minimum of a function by repeatedly moving in the direction of steepest descent.
+
+Think of it like this:
+  
+- You're standing on a hillside in thick fog 
+- You can't see the valley below (the minimum) 
+- But you can feel the slope under your feet 
+- You take steps downhill, and eventually reach the bottom 
+
+The "slope" is the gradient, and the "steps" are our parameter updates.
+
+## Key Concepts We'll Cover
+
+1. **The Gradient**: The vector of partial derivatives
+2. **The Update Rule**: How we adjust parameters
+3. **Learning Rate**: How big our steps should be
+4. **Convergence**: When to stop iterating
+5. **Connection to OLS**: Why gradient descent finds the same solution
+
+# Building Intuition: A Simple Example
+
+## Understanding the Gradient: Direction and Magnitude
+
+Before we dive into the mathematics, let's build a figurative understanding of what the gradient tells us.
+
+**The gradient is the slope of our cost function.** It tells us two crucial things:
+
+1. **Direction**: Which way to go (uphill or downhill)
+2. **Magnitude**: How steep the hill is (how big our step should be)
+
+Think of it this way:
+  
+- You're standing on a hillside and you measure the slope under your feet 
+- If the slope is **positive** (+), you're facing uphill → to go down, you need to move **backwards** (reduce x) 
+- If the slope is **negative** (-), you're facing downhill → to go down, you need to move **forwards** (increase x) 
+- The **steeper** the slope (larger magnitude), the **bigger** the step you can safely take 
+- The **flatter** the slope (smaller magnitude), the **smaller** the step you should take (you're near the bottom!)  
+
+### Visual Intuition
+
+```{r gradient-intuition, echo=FALSE}
+# Create a simple function to demonstrate gradient concepts
+f_demo <- function(x) {
+  (x - 3)^2 + 2
+}
+
+f_prime_demo <- function(x) {
+  2 * (x - 3)
+}
+
+# Create points to demonstrate different scenarios
+x_points <- c(0.5, 2, 3, 4, 5.5)
+y_points <- f_demo(x_points)
+slopes <- f_prime_demo(x_points)
+
+# Create data for the function curve
+x_curve <- seq(-1, 7, length.out = 200)
+y_curve <- f_demo(x_curve)
+
+# Create the visualization
+library(ggplot2)
+df_curve <- data.frame(x = x_curve, y = y_curve)
+df_points <- data.frame(
+  x = x_points,
+  y = y_points,
+  slope = slopes,
+  label = c("Steep negative\n(big step right)", 
+            "Small negative\n(small step right)",
+            "Zero\n(at minimum!)",
+            "Small positive\n(small step left)",
+            "Steep positive\n(big step left)")
+)
+
+ggplot() +
+  geom_line(data = df_curve, aes(x = x, y = y), 
+            size = 1.5, color = "darkblue") +
+  geom_point(data = df_points, aes(x = x, y = y), 
+             size = 4, color = "red") +
+  # Add tangent lines to show slopes
+  geom_segment(data = df_points[df_points$x != 3, ],
+               aes(x = x - 0.5, xend = x + 0.5,
+                   y = y - 0.5 * slope, yend = y + 0.5 * slope),
+               color = "orange", size = 1.5, alpha = 0.7) +
+  # Add arrows showing direction to move
+  geom_segment(data = df_points[df_points$x < 3, ],
+               aes(x = x, xend = x + 0.3,
+                   y = y - 0.5, yend = y - 0.5),
+               arrow = arrow(length = unit(0.3, "cm")),
+               color = "green", size = 1.2) +
+  geom_segment(data = df_points[df_points$x > 3, ],
+               aes(x = x, xend = x - 0.3,
+                   y = y - 0.5, yend = y - 0.5),
+               arrow = arrow(length = unit(0.3, "cm")),
+               color = "green", size = 1.2) +
+  geom_text(data = df_points, aes(x = x, y = y + 1.5, label = label),
+            size = 3.5, color = "darkred") +
+  labs(title = "The Gradient Tells Us Direction and Step Size",
+       subtitle = "Orange lines show the slope (gradient), green arrows show which way to move",
+       x = "x", y = "f(x)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"))
+```
+
+### The Decision Process at Each Point
+
+```{r gradient-decision-table, echo=FALSE}
+# Create a decision table
+decision_table <- data.frame(
+  Position = c("x = 0.5", "x = 2", "x = 3", "x = 4", "x = 5.5"),
+  `Function_Value` = round(f_demo(x_points), 2),
+  `Gradient` = round(slopes, 2),
+  `Sign` = c("Negative (-)", "Negative (-)", "Zero", "Positive (+)", "Positive (+)"),
+  `Magnitude` = c("Large (5)", "Small (2)", "Zero", "Small (2)", "Large (5)"),
+  `Direction_Decision` = c("Move RIGHT →", "Move RIGHT →", "STOP! ✓", 
+                          "Move LEFT ←", "Move LEFT ←"),
+  `Step_Size` = c("Big step", "Small step", "No step", "Small step", "Big step")
+)
+
+kable(decision_table, 
+      caption = "How the Gradient Guides Our Decisions",
+      col.names = c("Position", "f(x)", "Gradient", "Sign", "Magnitude", 
+                    "Direction", "Step Size")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  row_spec(3, bold = TRUE, color = "white", background = "green")
+```
+
+### The Update Rule Decoded
+
+Now we can understand the gradient descent update rule intuitively:
+
+$$x_{new} = x_{current} - \alpha \cdot \text{gradient}$$
+
+Breaking this down:
+  
+- **If gradient is positive** (+5): We subtract a positive number → x decreases → we move left 
+- **If gradient is negative** (-5): We subtract a negative number → x increases → we move right 
+- **Large gradient** (±10): Big change in x → big step 
+- **Small gradient** (±0.1): Small change in x → small step 
+- **Learning rate α**: Controls how much we trust the gradient (like a "caution factor")  
+
+```{r update-rule-examples, echo=FALSE}
+# Show concrete examples of the update rule
+alpha <- 0.1  # Learning rate
+
+examples <- data.frame(
+  `Current_x` = c(0.5, 5.5, 2.0, 4.0),
+  `Gradient` = round(f_prime_demo(c(0.5, 5.5, 2.0, 4.0)), 2),
+  `Alpha` = alpha
+)
+
+examples$Update_Calculation <- paste0(
+  examples$Current_x, " - ", examples$Alpha, " × ", examples$Gradient
+)
+
+examples$New_x <- round(examples$Current_x - alpha * examples$Gradient, 2)
+examples$Moved_Direction <- ifelse(examples$New_x > examples$Current_x, "RIGHT →", "LEFT ←")
+
+kable(examples,
+      caption = "Concrete Examples of the Update Rule (α = 0.1)",
+      col.names = c("Current x", "Gradient", "α", "Calculation", "New x", "Direction")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+cat("\n✓ Notice: Negative gradient → x increases (move right)\n")
+cat("✓ Notice: Positive gradient → x decreases (move left)\n")
+cat("✓ Always moving toward x = 3 (the minimum)!\n")
+```
+
+## One-Dimensional Case
+
+Now let's apply this understanding to find the minimum of our simple quadratic function:
+
+$$f(x) = (x - 3)^2 + 2$$
+
+We know from calculus that the minimum occurs where $f'(x) = 0$:
+$$f'(x) = 2(x - 3) = 0 \implies x = 3$$
+
+But let's find it using gradient descent!
+
+```{r simple-function}
+# Define our function and its derivative
+f <- function(x) {
+  (x - 3)^2 + 2
+}
+
+f_prime <- function(x) {
+  2 * (x - 3)
+}
+
+# Visualize the function
+x_vals <- seq(-2, 8, length.out = 1000)
+y_vals <- f(x_vals)
+
+# Create base plot
+ggplot(data.frame(x = x_vals, y = y_vals), aes(x = x, y = y)) +
+  geom_line(size = 1.5, color = "darkblue") +
+  geom_point(x = 3, y = f(3), size = 4, color = "red") +
+  annotate("text", x = 3, y = f(3) - 0.5, 
+           label = "Minimum at x = 3", color = "red", size = 5) +
+  labs(title = "Simple Quadratic Function: f(x) = (x - 3)² + 2",
+       x = "x", y = "f(x)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"))
+```
+
+## Gradient Descent Algorithm
+
+The gradient descent update rule is:
+
+$$x_{t+1} = x_t - \alpha \cdot f'(x_t)$$
+
+where:
+  
+- $x_t$ is the current position 
+- $\alpha$ is the learning rate 
+- $f'(x_t)$ is the gradient at the current position  
+
+Let's implement this step by step:
+
+```{r gradient-descent-simple}
+# Gradient descent implementation
+gradient_descent_1d <- function(start_x, learning_rate, n_iterations) {
+  x <- start_x
+  trajectory <- data.frame(
+    iteration = 0:n_iterations,
+    x = numeric(n_iterations + 1),
+    f_x = numeric(n_iterations + 1),
+    gradient = numeric(n_iterations + 1)
+  )
+  
+  trajectory[1, ] <- c(0, x, f(x), f_prime(x))
+  
+  for (i in 1:n_iterations) {
+    gradient <- f_prime(x)
+    x <- x - learning_rate * gradient
+    trajectory[i + 1, ] <- c(i, x, f(x), f_prime(x))
+  }
+  
+  return(trajectory)
+}
+
+# Run gradient descent with different starting points
+trajectory1 <- gradient_descent_1d(start_x = -1, learning_rate = 0.1, n_iterations = 30)
+trajectory2 <- gradient_descent_1d(start_x = 7, learning_rate = 0.1, n_iterations = 30)
+
+# Display first few iterations
+kable(head(trajectory1, 15), digits = 4,
+      caption = "First 10 Iterations of Gradient Descent (Starting from x = -1)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Visualizing the Descent Path
+
+```{r visualize-descent}
+# Create visualization of gradient descent path
+p1 <- ggplot(data.frame(x = x_vals, y = y_vals), aes(x = x, y = y)) +
+  geom_line(size = 1.5, color = "darkblue", alpha = 0.3) +
+  geom_point(data = trajectory1, aes(x = x, y = f_x), 
+             color = "green", size = 2, alpha = 0.7) +
+  geom_path(data = trajectory1, aes(x = x, y = f_x), 
+            color = "green", size = 1, alpha = 0.5, 
+            arrow = arrow(length = unit(0.15, "cm"))) +
+  geom_point(x = 3, y = f(3), size = 4, color = "red") +
+  labs(title = "Gradient Descent Path (Starting from x = -1)",
+       x = "x", y = "f(x)") +
+  theme_minimal()
+
+p2 <- ggplot(data.frame(x = x_vals, y = y_vals), aes(x = x, y = y)) +
+  geom_line(size = 1.5, color = "darkblue", alpha = 0.3) +
+  geom_point(data = trajectory2, aes(x = x, y = f_x), 
+             color = "orange", size = 2, alpha = 0.7) +
+  geom_path(data = trajectory2, aes(x = x, y = f_x), 
+            color = "orange", size = 1, alpha = 0.5,
+            arrow = arrow(length = unit(0.15, "cm"))) +
+  geom_point(x = 3, y = f(3), size = 4, color = "red") +
+  labs(title = "Gradient Descent Path (Starting from x = 7)",
+       x = "x", y = "f(x)") +
+  theme_minimal()
+
+p1 / p2
+```
+
+## Key Observations
+
+Notice how:
+  
+1. **Both paths converge to the same minimum** (x = 3) 
+2. **The gradient gets smaller** as we approach the minimum 
+3. **Steps become smaller** near the minimum (gradient → 0) 
+4. **Different starting points** lead to the same solution 
+
+# Mathematical Foundation
+
+## The Gradient Vector
+
+For a function of multiple variables $f(\boldsymbol{\theta})$ where $\boldsymbol{\theta} = [\theta_1, \theta_2, ..., \theta_n]^T$, the gradient is:
+
+$$\nabla f(\boldsymbol{\theta}) = \begin{bmatrix}
+\frac{\partial f}{\partial \theta_1} \\
+\frac{\partial f}{\partial \theta_2} \\
+\vdots \\
+\frac{\partial f}{\partial \theta_n}
+\end{bmatrix}$$
+
+The gradient points in the direction of **steepest ascent**. To minimize, we move in the **opposite direction**.
+
+## The Update Rule
+
+The general gradient descent update rule for multiple parameters is:
+
+$$\boldsymbol{\theta}^{(t+1)} = \boldsymbol{\theta}^{(t)} - \alpha \nabla f(\boldsymbol{\theta}^{(t)})$$
+
+This can be written component-wise as:
+$$\theta_i^{(t+1)} = \theta_i^{(t)} - \alpha \frac{\partial f}{\partial \theta_i}\Big|_{\boldsymbol{\theta}^{(t)}}$$
+
+## Learning Rate Selection
+
+The learning rate $\alpha$ is crucial:
+  
+- **Too small**: Convergence is slow 
+- **Too large**: May overshoot and diverge 
+- **Just right**: Efficient convergence  
+
+Let's demonstrate this:
+
+```{r learning-rate-comparison}
+# Compare different learning rates
+trajectories <- list()
+learning_rates <- c(0.01, 0.1, 0.5, 0.9)
+
+for (lr in learning_rates) {
+  traj <- gradient_descent_1d(start_x = 7, learning_rate = lr, n_iterations = 30)
+  traj$learning_rate <- lr
+  trajectories[[length(trajectories) + 1]] <- traj
+}
+
+# Combine all trajectories
+all_trajectories <- do.call(rbind, trajectories)
+all_trajectories$learning_rate <- factor(all_trajectories$learning_rate)
+
+# Plot convergence for different learning rates
+ggplot(all_trajectories, aes(x = iteration, y = x, color = learning_rate)) +
+  geom_line(size = 1.2) +
+  geom_hline(yintercept = 3, linetype = "dashed", color = "red", alpha = 0.5) +
+  scale_color_manual(values = c("blue", "green", "orange", "purple"),
+                    name = "Learning Rate (α)") +
+  labs(title = "Effect of Learning Rate on Convergence",
+       subtitle = "Target: x = 3 (red dashed line)",
+       x = "Iteration", y = "x value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Show convergence in function value
+ggplot(all_trajectories, aes(x = iteration, y = f_x, color = learning_rate)) +
+  geom_line(size = 1.2) +
+  geom_hline(yintercept = 2, linetype = "dashed", color = "red", alpha = 0.5) +
+  scale_color_manual(values = c("blue", "green", "orange", "purple"),
+                    name = "Learning Rate (α)") +
+  scale_y_log10() +
+  labs(title = "Function Value During Optimization",
+       subtitle = "Minimum value: f(3) = 2 (red dashed line)",
+       x = "Iteration", y = "f(x) [log scale]") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+# Application to Linear Regression
+
+## The Optimization Problem
+
+Now let's apply gradient descent to the problem we solved analytically in Week 1. We want to minimize the Residual Sum of Squares:
+
+$$RSS(\beta_0, \beta_1) = \sum_{i=1}^{n} (y_i - \beta_0 - \beta_1 x_i)^2$$
+
+## Deriving the Gradients
+
+To use gradient descent, we need the partial derivatives:
+
+### For $\beta_0$:
+
+**Step 1: Write out the RSS**
+$$\frac{\partial RSS}{\partial \beta_0} = \frac{\partial}{\partial \beta_0} \sum_{i=1}^{n} (y_i - \beta_0 - \beta_1 x_i)^2$$
+
+**Step 2: Apply the sum rule**
+The derivative of a sum is the sum of derivatives:
+$$= \sum_{i=1}^{n} \frac{\partial}{\partial \beta_0} (y_i - \beta_0 - \beta_1 x_i)^2$$
+
+**Step 3: Identify the composition**
+For each term, we have a composite function:
+- **Outer function**: $u^2$ where $u = (y_i - \beta_0 - \beta_1 x_i)$
+- **Inner function**: $u(\beta_0) = y_i - \beta_0 - \beta_1 x_i$
+
+**Step 4: Apply the chain rule**
+The chain rule states: $\frac{d}{dx}[f(g(x))] = f'(g(x)) \cdot g'(x)$
+
+For our case: $\frac{d}{d\beta_0}[u^2] = 2u \cdot \frac{du}{d\beta_0}$
+
+**Step 5: Find the outer derivative**
+$$\frac{d}{du}[u^2] = 2u = 2(y_i - \beta_0 - \beta_1 x_i)$$
+
+**Step 6: Find the inner derivative**
+$$\frac{du}{d\beta_0} = \frac{\partial}{\partial \beta_0}(y_i - \beta_0 - \beta_1 x_i) = 0 - 1 - 0 = -1$$
+
+Note: $y_i$ and $\beta_1 x_i$ are treated as constants with respect to $\beta_0$
+
+**Step 7: Multiply the derivatives (chain rule)**
+$$\frac{\partial}{\partial \beta_0}(y_i - \beta_0 - \beta_1 x_i)^2 = 2(y_i - \beta_0 - \beta_1 x_i) \cdot (-1)$$
+
+**Step 8: Simplify and sum**
+$$\frac{\partial RSS}{\partial \beta_0} = \sum_{i=1}^{n} -2(y_i - \beta_0 - \beta_1 x_i) = -2 \sum_{i=1}^{n} (y_i - \beta_0 - \beta_1 x_i)$$
+
+### For $\beta_1$:
+
+**Step 1: Write out the RSS**
+$$\frac{\partial RSS}{\partial \beta_1} = \frac{\partial}{\partial \beta_1} \sum_{i=1}^{n} (y_i - \beta_0 - \beta_1 x_i)^2$$
+
+**Step 2: Apply the sum rule**
+$$= \sum_{i=1}^{n} \frac{\partial}{\partial \beta_1} (y_i - \beta_0 - \beta_1 x_i)^2$$
+
+**Step 3: Identify the composition**
+Again, we have a composite function:
+  
+- **Outer function**: $u^2$ where $u = (y_i - \beta_0 - \beta_1 x_i)$ 
+- **Inner function**: $u(\beta_1) = y_i - \beta_0 - \beta_1 x_i$ 
+
+**Step 4: Apply the chain rule**
+$$\frac{d}{d\beta_1}[u^2] = 2u \cdot \frac{du}{d\beta_1}$$
+
+**Step 5: Find the outer derivative**
+$$\frac{d}{du}[u^2] = 2u = 2(y_i - \beta_0 - \beta_1 x_i)$$
+
+**Step 6: Find the inner derivative**
+$$\frac{du}{d\beta_1} = \frac{\partial}{\partial \beta_1}(y_i - \beta_0 - \beta_1 x_i) = 0 - 0 - x_i = -x_i$$
+
+Note: $y_i$ and $\beta_0$ are treated as constants with respect to $\beta_1$, and $\frac{\partial}{\partial \beta_1}(\beta_1 x_i) = x_i$
+
+**Step 7: Multiply the derivatives (chain rule)**
+$$\frac{\partial}{\partial \beta_1}(y_i - \beta_0 - \beta_1 x_i)^2 = 2(y_i - \beta_0 - \beta_1 x_i) \cdot (-x_i)$$
+
+**Step 8: Simplify and sum**
+$$\frac{\partial RSS}{\partial \beta_1} = \sum_{i=1}^{n} -2x_i(y_i - \beta_0 - \beta_1 x_i) = -2 \sum_{i=1}^{n} x_i(y_i - \beta_0 - \beta_1 x_i)$$
+
+### Key Insight
+
+The only difference between the two gradients is in **Step 6** - the inner derivative:
+  
+- For $\beta_0$: $\frac{\partial}{\partial \beta_0}(y_i - \beta_0 - \beta_1 x_i) = -1$ 
+- For $\beta_1$: $\frac{\partial}{\partial \beta_1}(y_i - \beta_0 - \beta_1 x_i) = -x_i$ 
+
+This $x_i$ factor in the gradient for $\beta_1$ makes intuitive sense: the slope parameter $\beta_1$ affects the prediction proportionally to the input value $x_i$, so the gradient should also be proportional to $x_i$.
+
+## Generating Sample Data
+
+```{r generate-data}
+# Set seed for reproducibility
+set.seed(123)
+
+# Generate synthetic data
+n <- 100
+true_beta0 <- 2
+true_beta1 <- 3
+x <- runif(n, min = 0, max = 10)
+epsilon <- rnorm(n, mean = 0, sd = 2)
+y <- true_beta0 + true_beta1 * x + epsilon
+
+# Create data frame
+data <- data.frame(x = x, y = y)
+
+# Visualize the data
+ggplot(data, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, size = 2, color = "steelblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "red", linetype = "dashed") +
+  labs(title = "Synthetic Data for Linear Regression",
+       subtitle = sprintf("True parameters: β₀ = %g, β₁ = %g", true_beta0, true_beta1),
+       x = "x", y = "y") +
+  theme_minimal()
+
+# Calculate analytical solution for comparison
+X_matrix <- cbind(1, x)
+analytical_solution <- solve(t(X_matrix) %*% X_matrix) %*% t(X_matrix) %*% y
+cat("Analytical Solution (from Week 1 method):\n")
+cat(sprintf("β₀ = %.4f\n", analytical_solution[1]))
+cat(sprintf("β₁ = %.4f\n", analytical_solution[2]))
+```
+
+### Mathematical Derivation: From Scalar to Matrix Algebra
+
+In Week 1, we derived OLS using scalar algebra with summations. Now let's see how the **same solution** emerges elegantly using matrix algebra.
+
+#### Setup: The Matrix Formulation
+
+We have $n$ observations with:
+  
+- Response vector: $\mathbf{y} = \begin{bmatrix} y_1 \\ y_2 \\ \vdots \\ y_n \end{bmatrix}$ (n × 1) 
+- Design matrix: $X = \begin{bmatrix} 1 & x_1 \\ 1 & x_2 \\ \vdots & \vdots \\ 1 & x_n \end{bmatrix}$ (n × 2) 
+- Parameter vector: $\boldsymbol{\beta} = \begin{bmatrix} \beta_0 \\ \beta_1 \end{bmatrix}$ (2 × 1) 
+
+The model is: $\mathbf{y} = X\boldsymbol{\beta} + \boldsymbol{\epsilon}$
+
+The **scalar form** we saw in Week 1:
+$$RSS(\beta_0, \beta_1) = \sum_{i=1}^{n} (y_i - \beta_0 - \beta_1 x_i)^2$$
+
+can be written in **matrix form** as:
+$$RSS(\boldsymbol{\beta}) = (\mathbf{y} - X\boldsymbol{\beta})^T(\mathbf{y} - X\boldsymbol{\beta})$$
+
+This is the squared length of the residual vector $\mathbf{e} = \mathbf{y} - X\boldsymbol{\beta}$.
+
+Expanding the matrix product:
+$$RSS(\boldsymbol{\beta}) = \mathbf{y}^T\mathbf{y} - \mathbf{y}^TX\boldsymbol{\beta} - \boldsymbol{\beta}^TX^T\mathbf{y} + \boldsymbol{\beta}^TX^TX\boldsymbol{\beta}$$
+
+Since $\mathbf{y}^TX\boldsymbol{\beta}$ is a scalar, it equals its transpose:
+$$\mathbf{y}^TX\boldsymbol{\beta} = (\mathbf{y}^TX\boldsymbol{\beta})^T = \boldsymbol{\beta}^TX^T\mathbf{y}$$
+
+Therefore:
+$$RSS(\boldsymbol{\beta}) = \mathbf{y}^T\mathbf{y} - 2\boldsymbol{\beta}^TX^T\mathbf{y} + \boldsymbol{\beta}^TX^TX\boldsymbol{\beta}$$
+
+To minimize RSS, we take the derivative with respect to $\boldsymbol{\beta}$ and set it to zero.
+
+**Matrix Calculus Rules** we need:
+  
+1. $\frac{\partial}{\partial \boldsymbol{\beta}}(\mathbf{a}^T\boldsymbol{\beta}) = \mathbf{a}$ (derivative of linear term) 
+2. $\frac{\partial}{\partial \boldsymbol{\beta}}(\boldsymbol{\beta}^TA\boldsymbol{\beta}) = 2A\boldsymbol{\beta}$ (derivative of quadratic form, where A is symmetric) 
+
+Applying these rules:
+$$\frac{\partial RSS}{\partial \boldsymbol{\beta}} = \frac{\partial}{\partial \boldsymbol{\beta}}\left[\mathbf{y}^T\mathbf{y} - 2\boldsymbol{\beta}^TX^T\mathbf{y} + \boldsymbol{\beta}^TX^TX\boldsymbol{\beta}\right]$$
+
+$$= 0 - 2X^T\mathbf{y} + 2X^TX\boldsymbol{\beta}$$
+
+$$= -2X^T\mathbf{y} + 2X^TX\boldsymbol{\beta}$$
+
+For the minimum, we set $\frac{\partial RSS}{\partial \boldsymbol{\beta}} = \mathbf{0}$:
+
+$$-2X^T\mathbf{y} + 2X^TX\boldsymbol{\beta} = \mathbf{0}$$
+
+Divide by 2:
+$$X^TX\boldsymbol{\beta} = X^T\mathbf{y}$$
+
+These are the **Normal Equations** in matrix form!
+
+If $X^TX$ is invertible (which requires the columns of $X$ to be linearly independent), we can multiply both sides by $(X^TX)^{-1}$:
+
+$$(X^TX)^{-1}X^TX\boldsymbol{\beta} = (X^TX)^{-1}X^T\mathbf{y}$$
+
+Since $(X^TX)^{-1}X^TX = I$ (the identity matrix):
+$$\boldsymbol{\beta} = (X^TX)^{-1}X^T\mathbf{y}$$
+
+This is the **OLS solution in matrix form**!
+
+#### Connection to Week 1's Scalar Algebra
+
+The matrix formula $\boldsymbol{\beta} = (X^TX)^{-1}X^T\mathbf{y}$ is equivalent to the scalar formulas we derived in Week 1:
+
+For our simple linear regression with $X = \begin{bmatrix} 1 & x_1 \\ \vdots & \vdots \\ 1 & x_n \end{bmatrix}$:
+
+$$X^TX = \begin{bmatrix} n & \sum x_i \\ \sum x_i & \sum x_i^2 \end{bmatrix}$$
+
+$$X^T\mathbf{y} = \begin{bmatrix} \sum y_i \\ \sum x_i y_i \end{bmatrix}$$
+
+Computing $(X^TX)^{-1}X^T\mathbf{y}$ with these matrices yields exactly the formulas:
+
+$$\beta_1 = \frac{\sum(x_i - \bar{x})(y_i - \bar{y})}{\sum(x_i - \bar{x})^2}$$
+
+$$\beta_0 = \bar{y} - \beta_1\bar{x}$$
+
+that we derived using summation notation in Week 1!
+
+**Why Matrix Form is Powerful**
+
+The matrix formulation $\boldsymbol{\beta} = (X^TX)^{-1}X^T\mathbf{y}$:
+
+1. **Generalizes immediately** to multiple predictors (just add more columns to X)
+2. **Connects to geometric intuition** (projection onto column space of X)
+3. **Enables computational implementation** (one matrix equation instead of many formulas)
+4. **Reveals the structure** of the problem (symmetric matrix $X^TX$, projection matrix $X(X^TX)^{-1}X^T$)
+5. **Leads naturally to gradient descent** (when we can't or don't want to invert $X^TX$)
+
+
+## Implementing Gradient Descent for Regression
+
+```{r gradient-descent-regression}
+# Initialize parameters
+beta0 <- 0
+beta1 <- 0
+learning_rate <- 0.01
+n_iterations <- 1000
+n <- length(x)
+
+# Gradient descent loop
+for (i in 1:n_iterations) {
+  # Compute predictions and residuals
+  predictions <- beta0 + beta1 * x
+  residuals <- y - predictions
+  
+  # Compute gradients
+  grad_beta0 <- -2 * sum(residuals) / n
+  grad_beta1 <- -2 * sum(x * residuals) / n
+  
+  # Update parameters
+  beta0 <- beta0 - learning_rate * grad_beta0
+  beta1 <- beta1 - learning_rate * grad_beta1
+}
+
+# Show final results
+cat("\nGradient Descent Results:\n")
+cat(sprintf("Final: β₀ = %.4f, β₁ = %.4f\n", beta0, beta1))
+
+# Compare with analytical solution
+cat("\nComparison with Analytical Solution:\n")
+comparison <- data.frame(
+  Method = c("Analytical (Week 1)", "Gradient Descent"),
+  Beta0 = c(analytical_solution[1], beta0),
+  Beta1 = c(analytical_solution[2], beta1)
+)
+
+kable(comparison, digits = 4,
+      caption = "Comparison: Gradient Descent vs Analytical Solution") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+# Connection to BLUE Properties
+
+## Why Gradient Descent Finds the BLUE Estimator
+
+Recall from Week 2 that the sample mean (and by extension, OLS estimators) are BLUE:
+  
+- **Best**: Minimum variance among linear unbiased estimators 
+- **Linear**: Linear combination of observations 
+- **Unbiased**: Expected value equals true parameter 
+
+When we use gradient descent to minimize RSS, we're finding the same solution as the analytical OLS formula because:
+
+1. **The RSS is convex** in the parameters (unique global minimum)
+2. **The gradient at the minimum is zero** (same first-order conditions as OLS)
+3. **The solution satisfies** the normal equations from Week 1
+
+```{r blue-connection}
+# Verify that gradient descent solution satisfies normal equations
+beta_gd <- c(beta0, beta1)
+beta_ols <- as.vector(analytical_solution)
+
+# Normal equations: X'X β = X'y
+X_matrix <- cbind(1, x)
+normal_lhs_gd <- t(X_matrix) %*% X_matrix %*% beta_gd
+normal_rhs <- t(X_matrix) %*% y
+normal_lhs_ols <- t(X_matrix) %*% X_matrix %*% beta_ols
+
+# Compare
+normal_comparison <- data.frame(
+  Equation = c("X'Xβ (GD)", "X'Xβ (OLS)", "X'y"),
+  `First_Component` = c(normal_lhs_gd[1], normal_lhs_ols[1], normal_rhs[1]),
+  `Second_Component` = c(normal_lhs_gd[2], normal_lhs_ols[2], normal_rhs[2])
+)
+
+kable(normal_comparison, digits = 4,
+      caption = "Verification: Both Methods Satisfy the Normal Equations") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+cat("\n✓ Both gradient descent and OLS satisfy X'Xβ = X'y\n")
+cat("✓ Therefore, gradient descent finds the BLUE estimator!\n")
+```
+
+# Practical Considerations
+
+## Advantages of Gradient Descent
+
+1. **Scalability**: Works with millions of parameters
+2. **Memory Efficiency**: No need to store or invert large matrices
+3. **Flexibility**: Can optimize any differentiable objective function
+4. **Online Learning**: Can update with new data incrementally
+
+## Disadvantages
+
+1. **Requires tuning**: Learning rate selection is crucial
+2. **Iterative**: May need many iterations to converge
+3. **Local minima**: For non-convex problems (not an issue for OLS)
+4. **Numerical precision**: Can have stability issues with poor scaling
+
+## Feature Scaling
+
+Gradient descent converges faster when features are on similar scales:
+
+```{r feature-scaling}
+# Demonstrate effect of feature scaling
+set.seed(456)
+
+# Create data with different scales
+n <- 100
+x1 <- runif(n, min = 0, max = 1)        # Small scale
+x2 <- runif(n, min = 1000, max = 5000)  # Large scale
+y <- 2 + 3*x1 + 0.001*x2 + rnorm(n, sd = 0.5)
+
+# Standardize features
+x1_scaled <- (x1 - mean(x1)) / sd(x1)
+x2_scaled <- (x2 - mean(x2)) / sd(x2)
+
+# Run gradient descent on both versions
+X_unscaled <- cbind(1, x1, x2)
+X_scaled <- cbind(1, x1_scaled, x2_scaled)
+
+# Simple gradient descent function
+run_gd <- function(X, y, n_iter = 1000, lr = 0.0001) {
+  beta <- c(0, 0, 0)
+  for (i in 1:n_iter) {
+    predictions <- X %*% beta
+    grad <- -2 * t(X) %*% (y - predictions) / n
+    beta <- beta - lr * grad
+  }
+  return(beta)
+}
+
+# Compare results
+beta_unscaled <- run_gd(X_unscaled, y)
+beta_scaled <- run_gd(X_scaled, y)
+
+# Create comparison table
+comparison <- data.frame(
+  Method = c("Without Scaling", "With Scaling"),
+  Beta0 = c(beta_unscaled[1], beta_scaled[1]),
+  Beta1 = c(beta_unscaled[2], beta_scaled[2]),
+  Beta2 = c(beta_unscaled[3], beta_scaled[3])
+)
+
+kable(comparison, digits = 4,
+      caption = "Feature Scaling Effect (Learning Rate = 0.0001, 1000 iterations)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## When to Use Gradient Descent vs Analytical Solutions
+
+```{r decision-table, echo=FALSE}
+# Create decision matrix
+decision_guide <- data.frame(
+  Scenario = c(
+    "Small dataset (n < 10,000)",
+    "Large dataset (n > 1,000,000)",
+    "Few features (p < 100)",
+    "Many features (p > 10,000)",
+    "Linear model",
+    "Non-linear model",
+    "Real-time/online learning",
+    "Batch processing",
+    "Need exact solution",
+    "Approximate solution OK"
+  ),
+  `Analytical` = c(
+    "✓ Preferred", "✗ Too slow/memory",
+    "✓ Preferred", "✗ Matrix too large",
+    "✓ Available", "✗ No closed form",
+    "✗ Not suitable", "✓ Preferred",
+    "✓ Preferred", "✓ If tolerance high"
+  ),
+  `Gradient_Descent` = c(
+    "Works but slower", "✓ Preferred",
+    "Works but slower", "✓ Preferred",
+    "✓ Finds same solution", "✓ Only option",
+    "✓ Preferred", "Works",
+    "If high precision", "✓ Preferred"
+  )
+)
+
+kable(decision_guide,
+      caption = "When to Use Gradient Descent vs Analytical Solutions",
+      col.names = c("Scenario", "Analytical Solution", "Gradient Descent")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+# Real-World Extensions
+
+While we've focused on simple gradient descent, modern applications use several important variants:
+
+## Stochastic Gradient Descent (SGD)
+
+Instead of using all data points to compute the gradient:
+  
+- Use one random sample at a time 
+- Much faster per iteration 
+- Adds noise that can help escape local minima 
+- Essential for large datasets 
+
+## Mini-Batch Gradient Descent
+
+A compromise between full batch and SGD:
+  
+- Use a small subset (e.g., 32-256 samples) per iteration 
+- Balances computational efficiency with stability 
+- Standard in deep learning 
+
+## Adaptive Learning Rates
+
+Modern optimizers adjust the learning rate automatically:
+  
+- **AdaGrad**: Adapts learning rate per parameter 
+- **RMSprop**: Uses moving average of squared gradients 
+- **Adam**: Combines momentum with adaptive learning rates 
+
+## Momentum
+
+Add a "velocity" term to smooth the optimization path:
+$$\boldsymbol{v}_{t+1} = \gamma \boldsymbol{v}_t + \alpha \nabla f(\boldsymbol{\theta}_t)$$
+$$\boldsymbol{\theta}_{t+1} = \boldsymbol{\theta}_t - \boldsymbol{v}_{t+1}$$
+
+This helps:
+  
+- Accelerate convergence in consistent directions 
+- Dampen oscillations 
+- Navigate ravines in the loss landscape 
+
+# Summary and Key Takeaways
+
+1. **Gradient Descent Fundamentals**
+- An iterative optimization algorithm
+- Moves in the direction of steepest descent
+- Converges to the minimum for convex functions
+
+2. **The Update Rule**
+$$\boldsymbol{\theta}^{(t+1)} = \boldsymbol{\theta}^{(t)} - \alpha \nabla f(\boldsymbol{\theta}^{(t)})$$
+- Simple yet powerful
+- Learning rate α controls step size
+- Gradient points toward steepest increase
+
+3. **Connection to Previous Weeks**
+- **Week 1**: Gradient descent solves the same RSS minimization
+- **Week 2**: Finds the BLUE estimator for linear regression
+- Both methods satisfy the normal equations: $X^TX\beta = X^Ty$
+
+4. **Practical Considerations**
+- Learning rate selection is crucial
+- Feature scaling improves convergence
+- Multiple convergence criteria available
+- Trade-offs between analytical and iterative methods
+
+## The Bigger Picture
+
+Gradient descent is the foundation for modern machine learning:
+
+```{r summary-viz}
+# Create a summary visualization
+methods <- data.frame(
+  Method = c("Linear Regression", "Logistic Regression", 
+             "Neural Networks", "Deep Learning"),
+  Parameters = c(10, 100, 10000, 1000000),
+  Analytical = c("Yes", "No", "No", "No"),
+  GD_Essential = c("Optional", "Required", "Required", "Required")
+)
+
+ggplot(methods, aes(x = log10(Parameters), y = Method)) +
+  geom_point(aes(color = GD_Essential), size = 8) +
+  scale_color_manual(values = c("Optional" = "orange", 
+                               "Required" = "darkgreen")) +
+  scale_x_continuous(breaks = 1:6, 
+                    labels = c("10", "100", "1K", "10K", "100K", "1M")) +
+  labs(title = "Gradient Descent Becomes Essential as Model Complexity Grows",
+       x = "Number of Parameters (log scale)",
+       y = "Method",
+       color = "Gradient Descent") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+## Final Thoughts
+
+> "Gradient descent is not just an algorithm—it's a fundamental principle that connects simple linear regression to the most advanced deep learning models."
+
+Understanding gradient descent provides:
+
+- **Intuition** for how machine learning algorithms learn. 
+- **Foundation** for understanding modern optimizers 
+- **Bridge** between classical statistics and machine learning 
+- **Practical tool** for large-scale optimization 
+
+In upcoming weeks, we can extend these concepts to:
+  
+- Regularization (L1/L2 penalties) 
+- Logistic regression 
+- Multi-class classification 
+- Neural network backpropagation 
+
+The journey from the analytical solutions of Week 1, through the statistical properties of Week 2, to the iterative optimization of Week 3, shows how different perspectives on the same problem enrich our understanding and expand our toolkit.
+
+---
+
+### References
+
+- Boyd, S., & Vandenberghe, L. (2004). *Convex Optimization*. Cambridge University Press.
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). *Deep Learning*. MIT Press.
+- Ruder, S. (2016). An overview of gradient descent optimization algorithms. *arXiv preprint arXiv:1609.04747*.
+- Sutton, R. S., & Barto, A. G. (2018). *Reinforcement Learning: An Introduction*. MIT Press.
+
+### R Session Information
+
+```{r session-info}
+sessionInfo()
+```

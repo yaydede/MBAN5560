@@ -1,0 +1,1687 @@
+---
+title: "Dummy Variables and Probability Models"
+author: "Statistics for Business"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 8
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+library(ISLR2)  # For Default dataset
+```
+
+# Introduction
+
+In this lesson, we extend our regression toolkit to handle two important scenarios:
+
+1. **Dummy Variable Models**: How to include categorical predictors in regression
+2. **Probability Models**: How to model binary outcomes (0/1, yes/no, success/failure)
+
+Building on our understanding of conditional expectation and OLS from Week 2, we'll see how these techniques naturally extend to categorical variables and binary outcomes.
+
+# Part 1: Dummy Variable Models
+
+## Motivation: Categorical Predictors
+
+So far, we've worked with continuous predictors like education and wage. But many real-world variables are categorical:
+
+- Gender (Male/Female)
+- Region (North/South/East/West)
+- Product type (A/B/C)
+- Treatment group (Control/Treatment)
+
+**Question**: How do we include these in a regression model?
+
+**Answer**: We encode categorical variables as **dummy variables** (also called indicator variables or binary variables).
+
+## Mathematical Foundation of Dummy Variables
+
+### Binary Categories
+
+For a binary categorical variable (two categories), we create a dummy variable:
+
+$$D_i = \begin{cases} 
+1 & \text{if observation } i \text{ belongs to category 1} \\
+0 & \text{if observation } i \text{ belongs to category 0 (reference)}
+\end{cases}$$
+
+The regression model becomes:
+
+$$Y_i = \beta_0 + \beta_1 D_i + \varepsilon_i$$
+
+**Interpretation:**
+
+- When $D_i = 0$ (reference group): $E(Y_i|D_i=0) = \beta_0$
+- When $D_i = 1$ (treatment group): $E(Y_i|D_i=1) = \beta_0 + \beta_1$
+- Therefore: $\beta_1 = E(Y|D=1) - E(Y|D=0)$ (the mean difference between groups)
+
+### Example: Car Fuel Efficiency
+
+Let's use the `mtcars` dataset to predict miles per gallon (MPG) based on transmission type.
+
+```{r load-mtcars}
+# Load and prepare the mtcars dataset
+data(mtcars)
+
+# Create a copy and add descriptive labels
+cars <- mtcars %>%
+  mutate(
+    transmission = factor(am, levels = c(0, 1), 
+                         labels = c("Automatic", "Manual")),
+    transmission_dummy = am  # Keep numeric version for clarity
+  )
+
+# Display first few observations
+head(cars %>% select(mpg, transmission, transmission_dummy, wt, hp), 10) %>%
+  kable(caption = "Car Dataset: MPG by Transmission Type",
+        col.names = c("MPG", "Transmission", "Dummy (D)", "Weight", "Horsepower"),
+        digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r visualize-groups}
+# Visualize MPG by transmission type
+ggplot(cars, aes(x = transmission, y = mpg, fill = transmission)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 4, 
+               fill = "red", color = "black") +
+  labs(title = "MPG Distribution by Transmission Type",
+       subtitle = "Red diamonds indicate group means",
+       x = "Transmission Type",
+       y = "Miles Per Gallon (MPG)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Estimating the Dummy Variable Model
+
+Let's estimate the model: $\text{MPG}_i = \beta_0 + \beta_1 \cdot D_i + \varepsilon_i$
+
+```{r dummy-regression}
+# Fit the model
+model_dummy <- lm(mpg ~ transmission_dummy, data = cars)
+summary(model_dummy)
+```
+
+The estimated model is: $\widehat{\text{MPG}} = `r round(coef(model_dummy)[1], 3)` + `r round(coef(model_dummy)[2], 3)` \times D$
+
+### Verifying the Interpretation
+
+Let's verify that $\beta_1$ equals the difference in group means:
+
+```{r verify-interpretation}
+# Calculate group means
+group_means <- cars %>%
+  group_by(transmission) %>%
+  summarise(
+    n = n(),
+    mean_mpg = mean(mpg),
+    sd_mpg = sd(mpg)
+  )
+
+kable(group_means, 
+      caption = "Mean MPG by Transmission Type",
+      digits = 3,
+      col.names = c("Transmission", "n", "Mean MPG", "SD MPG")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+The coefficient $\beta_1 = `r round(coef(model_dummy)[2], 3)`$ equals the difference in group means: `r round(group_means$mean_mpg[2] - group_means$mean_mpg[1], 3)`. This shows that the dummy variable coefficient is simply the difference between group means, connecting regression to the two-sample t-test.
+
+## Multiple Categories: The k-1 Rule
+
+When a categorical variable has $k$ categories, we create $k-1$ dummy variables, leaving one category as the **reference group**.
+
+**Why k-1 and not k?** To avoid the **dummy variable trap** (perfect multicollinearity).
+
+### Mathematical Proof of the Dummy Variable Trap
+
+Suppose we have 3 categories and create 3 dummies: $D_1$, $D_2$, $D_3$. For every observation, exactly one dummy equals 1:
+
+$$D_1 + D_2 + D_3 = 1$$
+
+If we include all three in a regression with an intercept, we have:
+
+$$Y = \beta_0 \cdot 1 + \beta_1 D_1 + \beta_2 D_2 + \beta_3 D_3 + \varepsilon$$
+
+Since the intercept column (all 1's) equals $D_1 + D_2 + D_3$, the design matrix has linearly dependent columns. The matrix $X'X$ is singular and cannot be inverted, making OLS estimation impossible.
+
+**Solution**: Use k-1 dummies. One category becomes the reference (baseline), and coefficients represent differences from that baseline.
+
+### Example: Cylinders in Cars
+
+Let's model MPG using the number of cylinders (4, 6, or 8).
+
+```{r multiple-categories}
+# Create dummy variables for cylinders (using 4 cylinders as reference)
+cars <- cars %>%
+  mutate(
+    cyl_factor = factor(cyl),
+    cyl_6 = ifelse(cyl == 6, 1, 0),
+    cyl_8 = ifelse(cyl == 8, 1, 0)
+  )
+
+# Fit model with k-1 dummies
+model_cyl <- lm(mpg ~ cyl_6 + cyl_8, data = cars)
+summary(model_cyl)
+```
+
+**Interpretation**:
+
+- $\beta_0 = `r round(coef(model_cyl)[1], 2)`$: Mean MPG for 4-cylinder cars (reference)
+- $\beta_1 = `r round(coef(model_cyl)[2], 2)`$: 6-cylinder cars get `r round(coef(model_cyl)[2], 2)` fewer MPG than 4-cylinder
+- $\beta_2 = `r round(coef(model_cyl)[3], 2)`$: 8-cylinder cars get `r round(coef(model_cyl)[3], 2)` fewer MPG than 4-cylinder
+
+```{r verify-multiple-dummies}
+# Verify by comparing with group means
+cyl_means <- cars %>%
+  group_by(cyl) %>%
+  summarise(mean_mpg = mean(mpg), n = n())
+
+kable(cyl_means, 
+      caption = "Mean MPG by Number of Cylinders",
+      col.names = c("Cylinders", "Mean MPG", "n"),
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+The coefficients match the differences from the reference category (4 cylinders).
+
+## Interaction Terms
+
+Interaction terms allow the effect of one variable to depend on the value of another variable.
+
+### Dummy × Continuous Interactions
+
+Suppose we want to model how the relationship between weight and MPG differs by transmission type:
+
+$$\text{MPG}_i = \beta_0 + \beta_1 \cdot \text{Weight}_i + \beta_2 \cdot D_i + \beta_3 \cdot (\text{Weight}_i \times D_i) + \varepsilon_i$$
+
+**Interpretation:**
+
+For automatic transmission ($D=0$):
+$$E(\text{MPG}|\text{Weight}, D=0) = \beta_0 + \beta_1 \cdot \text{Weight}$$
+
+For manual transmission ($D=1$):
+$$E(\text{MPG}|\text{Weight}, D=1) = (\beta_0 + \beta_2) + (\beta_1 + \beta_3) \cdot \text{Weight}$$
+
+So:
+
+- $\beta_2$: Difference in intercept between manual and automatic
+- $\beta_3$: Difference in slope (how much steeper/flatter the relationship is for manual)
+
+```{r interaction-continuous}
+# Fit model with interaction
+model_interact <- lm(mpg ~ wt + transmission_dummy + wt:transmission_dummy, data = cars)
+summary(model_interact)
+
+# Visualize the interaction
+ggplot(cars, aes(x = wt, y = mpg, color = transmission)) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE, alpha = 0.2) +
+  labs(title = "MPG vs Weight by Transmission Type",
+       subtitle = "Interaction allows different slopes for each transmission type",
+       x = "Weight (1000 lbs)",
+       y = "Miles Per Gallon (MPG)",
+       color = "Transmission") +
+  theme_minimal()
+```
+
+The interaction term ($\beta_3 = `r round(coef(model_interact)[4], 2)`$) is `r ifelse(coef(model_interact)[4] > 0, "positive", "negative")`, indicating that the negative effect of weight on MPG is `r ifelse(coef(model_interact)[4] > 0, "less severe", "more severe")` for manual transmission cars.
+
+### Dummy × Dummy Interactions
+
+When we have two categorical variables, their interaction captures combined effects:
+
+$$Y_i = \beta_0 + \beta_1 D_{1i} + \beta_2 D_{2i} + \beta_3 (D_{1i} \times D_{2i}) + \varepsilon_i$$
+
+This creates 4 distinct groups:
+
+- $D_1=0, D_2=0$ (reference): $E(Y) = \beta_0$
+- $D_1=1, D_2=0$: $E(Y) = \beta_0 + \beta_1$
+- $D_1=0, D_2=1$: $E(Y) = \beta_0 + \beta_2$
+- $D_1=1, D_2=1$: $E(Y) = \beta_0 + \beta_1 + \beta_2 + \beta_3$
+
+The interaction $\beta_3$ captures whether the combined effect differs from the sum of individual effects.
+
+```{r interaction-dummy}
+# Create a binary variable for high performance (hp > median)
+cars <- cars %>%
+  mutate(high_hp = ifelse(hp > median(hp), 1, 0))
+
+# Fit model with dummy × dummy interaction
+model_dd_interact <- lm(mpg ~ transmission_dummy + high_hp + 
+                         transmission_dummy:high_hp, data = cars)
+summary(model_dd_interact)
+
+# Create means table for all four groups
+interaction_means <- cars %>%
+  group_by(transmission, high_hp_cat = ifelse(high_hp == 1, "High HP", "Low HP")) %>%
+  summarise(mean_mpg = mean(mpg), n = n(), .groups = "drop")
+
+kable(interaction_means, 
+      caption = "Mean MPG by Transmission Type and Horsepower",
+      col.names = c("Transmission", "Horsepower", "Mean MPG", "n"),
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+# Part 2: Probability Models for Binary Outcomes
+
+## Motivation: Predicting Binary Outcomes
+
+So far, our outcome $Y$ has been continuous (wage, MPG). But many important outcomes are binary:
+
+- Loan default (Yes/No)
+- Customer churn (Stay/Leave)
+- Product purchase (Buy/Don't Buy)
+- Disease diagnosis (Positive/Negative)
+
+**Challenge**: Standard OLS regression can predict values outside [0,1], which don't make sense as probabilities.
+
+## Linear Probability Model (LPM)
+
+### Mathematical Formulation
+
+For a binary outcome $Y_i \in \{0, 1\}$, we model the probability:
+
+$$P(Y_i = 1 | X_i) = \beta_0 + \beta_1 X_i$$
+
+Despite $Y$ being binary, we can still use OLS because:
+
+$$E(Y_i | X_i) = 1 \cdot P(Y_i=1|X_i) + 0 \cdot P(Y_i=0|X_i) = P(Y_i=1|X_i)$$
+
+So the conditional expectation equals the probability of success!
+
+### Coefficient Interpretation
+
+In LPM, $\beta_1$ represents the **marginal effect**: the change in probability for a one-unit increase in $X$.
+
+$$\frac{\partial P(Y=1|X)}{\partial X} = \beta_1$$
+
+This is much simpler to interpret than logistic regression coefficients.
+
+### Limitations of LPM
+
+Despite its simplicity, LPM has serious problems:
+
+1. **Predictions outside [0,1]**: Nothing constrains predictions to valid probabilities
+2. **Heteroskedasticity**: $\text{Var}(\varepsilon_i|X_i) = P(Y=1|X_i)[1-P(Y=1|X_i)]$ varies with $X$
+3. **Linear probability assumption**: Assumes constant marginal effects across all $X$ values
+
+### Analytical Derivation of Heteroskedasticity
+
+For binary $Y_i \in \{0, 1\}$:
+
+$$\text{Var}(Y_i | X_i) = E(Y_i^2|X_i) - [E(Y_i|X_i)]^2$$
+
+Since $Y_i^2 = Y_i$ for binary variables:
+
+$$\text{Var}(Y_i | X_i) = E(Y_i|X_i) - [E(Y_i|X_i)]^2 = p_i - p_i^2 = p_i(1-p_i)$$
+
+where $p_i = P(Y_i=1|X_i)$. Since $p_i$ changes with $X_i$, the variance is not constant—this is heteroskedasticity.
+
+## Logistic Regression
+
+### Motivation: Need for Bounded Predictions
+
+We need a model that:
+
+- Maps any real number to [0,1]
+- Has an S-shaped curve (probabilities should change slowly at extremes)
+- Is flexible and mathematically tractable
+
+The **logistic function** provides this:
+
+$$P(Y=1|X) = \frac{e^{\beta_0 + \beta_1 X}}{1 + e^{\beta_0 + \beta_1 X}} = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X)}}$$
+
+### The Logit Transformation
+
+Instead of modeling probability directly, we model the **log-odds** (logit):
+
+$$\text{logit}(p) = \log\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 X$$
+
+Where $\frac{p}{1-p}$ is the **odds**. Taking the exponential of both sides:
+
+$$\frac{p}{1-p} = e^{\beta_0 + \beta_1 X}$$
+
+Solving for $p$:
+
+$$p = \frac{e^{\beta_0 + \beta_1 X}}{1 + e^{\beta_0 + \beta_1 X}}$$
+
+This guarantees $0 < p < 1$ for any value of $X$.
+
+### Understanding Odds and Log-Odds
+
+**Odds**: The ratio of success probability to failure probability
+
+$$\text{Odds} = \frac{P(Y=1)}{P(Y=0)} = \frac{p}{1-p}$$
+
+**Examples**:
+
+- If $p = 0.5$: Odds = 1 (even odds)
+- If $p = 0.75$: Odds = 3 (3-to-1 odds in favor)
+- If $p = 0.9$: Odds = 9 (9-to-1 odds in favor)
+
+**Log-Odds (Logit)**: Taking the log makes the relationship linear:
+
+$$\log(\text{Odds}) = \log\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 X$$
+
+### Maximum Likelihood Estimation
+
+Unlike OLS, logistic regression has no closed-form solution. We use **Maximum Likelihood Estimation (MLE)**.
+
+#### The Likelihood Function
+
+For observation $i$, the probability of observing $Y_i$ is:
+
+$$P(Y_i | X_i) = p_i^{Y_i}(1-p_i)^{1-Y_i}$$
+
+This equals $p_i$ when $Y_i=1$ and $(1-p_i)$ when $Y_i=0$.
+
+The likelihood for all observations (assuming independence):
+
+$$L(\beta) = \prod_{i=1}^{n} p_i^{Y_i}(1-p_i)^{1-Y_i}$$
+
+where $p_i = \frac{e^{\beta_0 + \beta_1 X_i}}{1 + e^{\beta_0 + \beta_1 X_i}}$
+
+#### Log-Likelihood
+
+We maximize the log-likelihood (easier mathematically):
+
+$$\ell(\beta) = \sum_{i=1}^{n} \left[Y_i \log(p_i) + (1-Y_i)\log(1-p_i)\right]$$
+
+Substituting the logistic function:
+
+$$\ell(\beta) = \sum_{i=1}^{n} \left[Y_i(\beta_0 + \beta_1 X_i) - \log(1 + e^{\beta_0 + \beta_1 X_i})\right]$$
+
+#### Score Equations
+
+Taking derivatives with respect to $\beta$ and setting to zero:
+
+$$\frac{\partial \ell}{\partial \beta_0} = \sum_{i=1}^{n} (Y_i - p_i) = 0$$
+
+$$\frac{\partial \ell}{\partial \beta_1} = \sum_{i=1}^{n} X_i(Y_i - p_i) = 0$$
+
+These have no closed-form solution, so we use iterative methods (Newton-Raphson) to find $\hat{\beta}$ that maximizes $\ell(\beta)$.
+
+### Coefficient Interpretation
+
+Logistic regression coefficients can be interpreted in four complementary ways. Understanding all four provides complete insight into the model.
+
+#### Interpretation 1: Log-Odds (Logit)
+
+The most direct interpretation is on the **log-odds scale**:
+
+$$\log\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 X$$
+
+A one-unit increase in $X$ changes the log-odds by $\beta_1$. 
+
+**Note**: Log-odds can take any value from $-\infty$ to $+\infty$, making this a linear relationship.
+
+#### Interpretation 2: Odds
+
+The **odds** of an event is the ratio of success probability to failure probability:
+
+$$\text{Odds} = \frac{p}{1-p} = e^{\beta_0 + \beta_1 X}$$
+
+**Important distinction**: This is **odds** (a single value), not odds ratio (which compares two odds).
+
+- If $p = 0.5$, odds = 1 (even odds)
+- If $p = 0.75$, odds = 3 (3-to-1 in favor)
+- If $p = 0.9$, odds = 9 (9-to-1 in favor)
+
+Odds range from 0 to $\infty$.
+
+#### Interpretation 3: Odds Ratio
+
+The **odds ratio** compares odds at two different values of $X$:
+
+$$\text{Odds Ratio} = \frac{\text{Odds at } X+1}{\text{Odds at } X} = \frac{e^{\beta_0 + \beta_1(X+1)}}{e^{\beta_0 + \beta_1 X}} = e^{\beta_1}$$
+
+This tells us how the odds **multiply** for a one-unit increase in $X$.
+
+**Example**: If $\beta_1 = 0.693$, then $e^{0.693} \approx 2$. The odds double (multiply by 2) for each unit increase in $X$.
+
+**Key point**: The odds ratio is **constant** across all values of $X$ in logistic regression, unlike marginal effects which vary.
+
+#### Interpretation 4: Marginal Effects
+
+The **marginal effect** measures the change in probability for a one-unit increase in $X$:
+
+$$\frac{\partial P(Y=1|X)}{\partial X} = \beta_1 \cdot p(1-p)$$
+
+**Key insight**: The marginal effect **depends on the current probability level** $p$:
+  
+- Largest when $p=0.5$ (maximum of $\beta_1/4$) 
+- Approaches zero at probability extremes ($p \to 0$ or $p \to 1$) 
+- This creates the S-shaped logistic curve 
+
+We typically report:
+  
+- **Average Marginal Effect (AME)**: Average $\beta_1 \cdot p_i(1-p_i)$ across all observations 
+- **Marginal Effect at Means (MEM)**: Evaluate at $p = P(Y=1|\bar{X})$ 
+
+### Simple Numerical Example: All Four Interpretations
+
+Let's work through a concrete example to understand each interpretation.
+
+**Setup**: Suppose we have a logistic model for credit card default:
+
+$$\log\left(\frac{p}{1-p}\right) = -10 + 0.005 \times \text{Balance}$$
+
+So $\beta_0 = -10$ and $\beta_1 = 0.005$.
+
+#### Example 1: Customer with Balance = $1,000
+
+**Step 1: Calculate Log-Odds**
+$$\log\left(\frac{p}{1-p}\right) = -10 + 0.005(1000) = -10 + 5 = -5$$
+
+**Step 2: Calculate Odds**
+$$\text{Odds} = e^{-5} = 0.0067$$
+
+This means the odds are approximately **149-to-1 against defaulting** (since 1/0.0067 ≈ 149). In other words, for every 1 customer who defaults, about 149 customers do not default.
+
+**Step 3: Calculate Probability**
+$$p = \frac{e^{-5}}{1 + e^{-5}} = \frac{0.0067}{1.0067} = 0.0066$$
+
+So there's a 0.66% chance of default at this balance.
+
+**Step 4: Calculate Marginal Effect**
+$$\text{ME} = 0.005 \times 0.0066 \times (1-0.0066) = 0.005 \times 0.0066 \times 0.9934 = 0.0000328$$
+
+A $1 increase in balance increases default probability by 0.00328%.
+
+#### Example 2: Customer with Balance = $2,000
+
+**Step 1: Calculate Log-Odds**
+$$\log\left(\frac{p}{1-p}\right) = -10 + 0.005(2000) = -10 + 10 = 0$$
+
+**Step 2: Calculate Odds**
+$$\text{Odds} = e^{0} = 1$$
+
+The odds are exactly 1-to-1 (even odds).
+
+**Step 3: Calculate Probability**
+$$p = \frac{e^{0}}{1 + e^{0}} = \frac{1}{2} = 0.50$$
+
+There's a 50% chance of default at this balance.
+
+**Step 4: Calculate Marginal Effect**
+$$\text{ME} = 0.005 \times 0.50 \times (1-0.50) = 0.005 \times 0.50 \times 0.50 = 0.00125$$
+
+A $1 increase in balance increases default probability by 0.125%.
+
+#### Example 3: Odds Ratio for $1,000 Increase
+
+Compare Customer with Balance = $1,000 vs $2,000:
+
+**Odds Ratio**:
+$$\text{OR} = e^{\beta_1 \times 1000} = e^{0.005 \times 1000} = e^{5} = 148.4$$
+
+The odds of default multiply by 148.4 when balance increases from $1,000 to $2,000.
+
+**Verification**:
+  
+- Odds at $1,000: 0.0067 
+- Odds at $2,000: 1.0 
+- Ratio: $1.0 / 0.0067 = 149.3$ ✓ (slight rounding difference). 
+
+### Comparison Table: All Four Measures
+
+```{r interpretation-comparison-table}
+# Create a comprehensive comparison table
+interpretation_table <- data.frame(
+  Measure = c("Log-Odds (Logit)", "Odds", "Odds Ratio", "Marginal Effect"),
+  Formula = c(
+    "log(p/(1-p)) = β₀ + β₁X",
+    "p/(1-p) = exp(β₀ + β₁X)",
+    "exp(β₁) for 1-unit ↑ in X",
+    "β₁ × p × (1-p)"
+  ),
+  Range = c(
+    "(-∞, +∞)",
+    "(0, +∞)",
+    "(0, +∞)",
+    "(-∞, +∞)"
+  ),
+  Interpretation = c(
+    "Linear effect on log-odds scale",
+    "Ratio of success to failure probability",
+    "How odds multiply for 1-unit increase in X",
+    "Change in probability for 1-unit increase in X"
+  ),
+  Constant_Across_X = c(
+    "Slope β₁ is constant",
+    "No - odds change with X",
+    "Yes - always exp(β₁)",
+    "No - varies with probability level"
+  ),
+  Example_Value = c(
+    "At Balance=$1,000: -5",
+    "At Balance=$1,000: 0.0067",
+    "For $1,000 increase: 148.4",
+    "At Balance=$1,000: 0.0000328"
+  )
+)
+
+kable(interpretation_table,
+      caption = "Four Ways to Interpret Logistic Regression Coefficients",
+      col.names = c("Measure", "Formula", "Range", "Interpretation", 
+                    "Constant Across X?", "Example (β₁=0.005)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                full_width = TRUE, font_size = 12)
+```
+
+**Key Takeaways**:
+
+1. **Log-odds** provides the direct linear relationship
+2. **Odds** shows the ratio of success to failure at a given X
+3. **Odds ratio** (exp(β₁)) is the **multiplicative change** in odds - it's constant across all X values
+4. **Marginal effect** is most intuitive (change in probability) but varies with X
+
+For **reporting results**:
+- Academic papers often report odds ratios (constant and easy to compare)
+- Policy analysis often reports marginal effects (intuitive as probability changes)
+- Always clarify which interpretation you're using to avoid confusion!
+
+## Comparison: LPM vs Logistic Regression
+
+Let's compare these models using credit card default data.
+
+### Example: Credit Card Default
+
+```{r load-default-data}
+# Load the Default dataset from ISLR2
+data("Default")
+
+# Examine the data
+head(Default, 10) %>%
+  kable(caption = "Credit Card Default Dataset",
+        col.names = c("Default Status", "Student Status", "Balance", "Income"),
+        digits = 0) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Summary statistics
+summary(Default)
+
+# Create binary outcome
+Default <- Default %>%
+  mutate(
+    default_binary = ifelse(default == "Yes", 1, 0),
+    student_binary = ifelse(student == "Yes", 1, 0)
+  )
+```
+
+### Fit Both Models
+
+```{r fit-both-models}
+# Linear Probability Model
+lpm_model <- lm(default_binary ~ balance, data = Default)
+
+# Logistic Regression
+logit_model <- glm(default_binary ~ balance, data = Default, family = binomial)
+
+# Display results side by side
+lpm_summary <- summary(lpm_model)
+logit_summary <- summary(logit_model)
+
+# Extract coefficients
+lpm_coef <- coef(lpm_model)
+logit_coef <- coef(logit_model)
+
+# Create comparison table
+comparison_table <- data.frame(
+  Model = c("LPM", "Logistic"),
+  Intercept = c(lpm_coef[1], logit_coef[1]),
+  Slope = c(lpm_coef[2], logit_coef[2])
+)
+
+kable(comparison_table, 
+      caption = "Model Comparison: LPM vs Logistic Regression",
+      digits = 6) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Note**: The coefficients are not directly comparable because:
+
+- LPM: $\beta_1$ is the marginal effect on probability
+- Logistic: $\beta_1$ is the effect on log-odds
+
+### Visualize Predictions
+
+```{r compare-predictions}
+# Create prediction grid - extend range to show boundary violations
+balance_grid <- data.frame(balance = seq(-500, 3500, length.out = 150))
+
+# Get predictions from both models
+balance_grid$lpm_pred <- predict(lpm_model, newdata = balance_grid)
+balance_grid$logit_pred <- predict(logit_model, newdata = balance_grid, type = "response")
+
+# Identify where LPM violates boundaries
+balance_grid$lpm_violation <- ifelse(balance_grid$lpm_pred < 0 | balance_grid$lpm_pred > 1, 
+                                     "Violation", "Valid")
+
+# Plot comparison
+ggplot(Default, aes(x = balance, y = default_binary)) +
+  geom_point(alpha = 0.1, position = position_jitter(height = 0.02)) +
+  # Add shaded regions for invalid probabilities
+  geom_rect(aes(xmin = -500, xmax = 3500, ymin = -Inf, ymax = 0), 
+            fill = "pink", alpha = 0.3) +
+  geom_rect(aes(xmin = -500, xmax = 3500, ymin = 1, ymax = Inf), 
+            fill = "pink", alpha = 0.3) +
+  # Add boundary lines
+  geom_hline(yintercept = c(0, 1), linetype = "dashed", color = "black", size = 1) +
+  # Add model predictions
+  geom_line(data = balance_grid, aes(y = lpm_pred, color = "LPM"), 
+            size = 1.5, alpha = 0.8) +
+  geom_line(data = balance_grid, aes(y = logit_pred, color = "Logistic"), 
+            size = 1.5, alpha = 0.8) +
+  # Add text annotations
+  annotate("text", x = 2500, y = 1.15, label = "Invalid: p > 1", 
+           size = 4, color = "red", fontface = "bold") +
+  annotate("text", x = 200, y = -0.1, label = "Invalid: p < 0", 
+           size = 4, color = "red", fontface = "bold") +
+  labs(title = "LPM vs Logistic Regression Predictions",
+       subtitle = "Pink regions show invalid probability ranges where LPM predictions violate [0,1] bounds",
+       x = "Credit Card Balance ($)",
+       y = "Predicted Probability of Default",
+       color = "Model") +
+  scale_color_manual(values = c("LPM" = "red", "Logistic" = "blue")) +
+  coord_cartesian(ylim = c(-0.2, 1.3), xlim = c(0, 3000)) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.subtitle = element_text(size = 10))
+
+# Show where LPM predictions are invalid
+invalid_regions <- data.frame(
+  Region = c("Balance < 0", "Balance > 2500"),
+  LPM_Prediction = c(
+    paste0(round(predict(lpm_model, newdata = data.frame(balance = 0)), 3)),
+    paste0(round(predict(lpm_model, newdata = data.frame(balance = 2500)), 3))
+  ),
+  Status = c(
+    ifelse(predict(lpm_model, newdata = data.frame(balance = 0)) < 0, "Invalid (< 0)", "Valid"),
+    ifelse(predict(lpm_model, newdata = data.frame(balance = 2500)) > 1, "Invalid (> 1)", "Valid")
+  )
+)
+
+kable(invalid_regions,
+      caption = "LPM Boundary Violations at Different Balance Levels",
+      col.names = c("Balance Range", "LPM Prediction", "Status")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Key Observations**:
+
+1. LPM predictions can fall outside [0,1] (invalid probabilities)
+2. Logistic curve is S-shaped, respecting probability bounds
+3. In the middle range, predictions are similar
+4. At extremes, logistic provides more realistic predictions
+
+### Calculate Marginal Effects for Logistic
+
+```{r marginal-effects}
+# Function to calculate marginal effect
+calc_marginal_effect <- function(beta, p) {
+  return(beta * p * (1 - p))
+}
+
+# Get fitted probabilities
+Default$fitted_prob <- predict(logit_model, type = "response")
+
+# Calculate marginal effect for each observation
+Default$marginal_effect <- calc_marginal_effect(
+  logit_coef[2], 
+  Default$fitted_prob
+)
+
+# Average Marginal Effect (AME)
+ame <- mean(Default$marginal_effect)
+
+# Marginal Effect at Means (MEM)
+mean_balance <- mean(Default$balance)
+mean_prob <- predict(logit_model, 
+                     newdata = data.frame(balance = mean_balance), 
+                     type = "response")
+mem <- calc_marginal_effect(logit_coef[2], mean_prob)
+
+# Create summary table
+me_summary <- data.frame(
+  Measure = c("LPM Coefficient", "Average Marginal Effect (AME)", 
+              "Marginal Effect at Means (MEM)"),
+  Value = c(lpm_coef[2], ame, mem),
+  Interpretation = c(
+    "Change in probability per $1 increase in balance",
+    "Average change in probability across all observations",
+    "Change in probability at mean balance"
+  )
+)
+
+kable(me_summary, 
+      caption = "Marginal Effects Comparison",
+      digits = 6,
+      col.names = c("Measure", "Value", "Interpretation")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+The LPM coefficient (`r round(lpm_coef[2], 6)`) is close to the AME (`r round(ame, 6)`), showing that for many practical purposes, LPM provides a reasonable approximation to average marginal effects.
+
+#### Understanding AME vs MEM: Detailed Calculation
+
+Let's examine how these marginal effects are calculated in detail.
+
+**Formula for marginal effect in logistic regression**:
+
+$$\frac{\partial P(Y=1|X)}{\partial X} = \beta_1 \cdot P(Y=1|X) \cdot [1 - P(Y=1|X)] = \beta_1 \cdot p \cdot (1-p)$$
+
+```{r ame-mem-details}
+# Show calculation details for a few observations
+sample_obs <- Default %>%
+  slice(c(1, 500, 1000, 5000, 10000)) %>%
+  select(balance, default_binary, fitted_prob, marginal_effect)
+
+kable(sample_obs,
+      caption = "Marginal Effects for Selected Observations",
+      digits = 6,
+      col.names = c("Balance", "Actual Default", "P(Default=1 given Balance)", 
+                    "Marginal Effect = β₁ × p × (1-p)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Manual calculation for first observation to show the formula
+obs1 <- Default[1, ]
+me1_manual <- logit_coef[2] * obs1$fitted_prob * (1 - obs1$fitted_prob)
+```
+
+**Example Calculation** (First observation with balance = $`r round(Default$balance[1], 2)`):
+
+1. Predicted probability: $p = `r round(Default$fitted_prob[1], 6)`$
+2. Coefficient: $\beta_1 = `r round(logit_coef[2], 6)`$
+3. Marginal effect: $\beta_1 \times p \times (1-p) = `r round(logit_coef[2], 6)` \times `r round(Default$fitted_prob[1], 6)` \times `r round(1 - Default$fitted_prob[1], 6)` = `r round(me1_manual, 6)`$
+
+This means: a $1 increase in balance increases the probability of default by `r round(me1_manual, 6)` (about `r round(me1_manual * 100, 4)`%) for this particular observation.
+
+**Average Marginal Effect (AME)**:
+
+AME averages the marginal effect across all observations:
+
+$$\text{AME} = \frac{1}{n}\sum_{i=1}^{n} \beta_1 \cdot p_i \cdot (1-p_i)$$
+
+```{r ame-calculation-details}
+# Show distribution of marginal effects
+me_distribution <- data.frame(
+  Statistic = c("Minimum", "1st Quartile", "Median", "Mean (AME)", 
+                "3rd Quartile", "Maximum", "Std. Dev."),
+  Value = c(
+    min(Default$marginal_effect),
+    quantile(Default$marginal_effect, 0.25),
+    median(Default$marginal_effect),
+    mean(Default$marginal_effect),
+    quantile(Default$marginal_effect, 0.75),
+    max(Default$marginal_effect),
+    sd(Default$marginal_effect)
+  )
+)
+
+kable(me_distribution,
+      caption = "Distribution of Marginal Effects Across All Observations",
+      digits = 6,
+      col.names = c("Statistic", "Marginal Effect")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Marginal Effect at Means (MEM)**:
+
+MEM evaluates the marginal effect at the mean value of X:
+
+$$\text{MEM} = \beta_1 \cdot P(Y=1|\bar{X}) \cdot [1 - P(Y=1|\bar{X})]$$
+
+```{r mem-calculation-details}
+# Show MEM calculation step by step
+mem_details <- data.frame(
+  Step = c("1. Mean Balance", 
+           "2. Probability at Mean", 
+           "3. (1 - Probability)",
+           "4. Coefficient β₁",
+           "5. MEM = β₁ × p × (1-p)"),
+  Value = c(
+    round(mean_balance, 2),
+    round(mean_prob, 6),
+    round(1 - mean_prob, 6),
+    round(logit_coef[2], 6),
+    round(mem, 6)
+  ),
+  Interpretation = c(
+    paste0("Average balance across all customers"),
+    paste0("P(Default=1 given Balance=", round(mean_balance, 2), ")"),
+    paste0("P(Default=0 given Balance=", round(mean_balance, 2), ")"),
+    "Logistic regression coefficient",
+    paste0("Change in probability at mean balance")
+  )
+)
+
+kable(mem_details,
+      caption = "Step-by-Step MEM Calculation",
+      col.names = c("Step", "Value", "Interpretation")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Why AME ≠ MEM?**
+
+The marginal effect $\beta_1 \cdot p \cdot (1-p)$ is **non-linear** in $p$. Therefore:
+
+$$\text{Average of } f(p_i) \neq f(\text{Average of } p_i)$$
+
+This is Jensen's inequality for non-linear functions.
+
+```{r visualize-ame-mem}
+# Create visualization comparing AME and MEM
+balance_range <- seq(min(Default$balance), max(Default$balance), length.out = 100)
+prob_range <- predict(logit_model, 
+                      newdata = data.frame(balance = balance_range), 
+                      type = "response")
+me_range <- logit_coef[2] * prob_range * (1 - prob_range)
+
+me_viz <- data.frame(
+  balance = balance_range,
+  probability = prob_range,
+  marginal_effect = me_range
+)
+
+ggplot(me_viz, aes(x = balance, y = marginal_effect)) +
+  geom_line(color = "blue", size = 1.2) +
+  geom_hline(yintercept = ame, color = "red", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = mean_balance, color = "darkgreen", linetype = "dotted", size = 1) +
+  geom_point(aes(x = mean_balance, y = mem), color = "darkgreen", size = 4) +
+  annotate("text", x = mean_balance + 200, y = ame + 0.00001, 
+           label = paste0("AME = ", round(ame, 6)), color = "red", hjust = 0) +
+  annotate("text", x = mean_balance + 200, y = mem - 0.00001, 
+           label = paste0("MEM = ", round(mem, 6)), color = "darkgreen", hjust = 0) +
+  labs(title = "Marginal Effect Varies with Balance Level",
+       subtitle = "AME (red dashed) is the average; MEM (green point) is at mean balance",
+       x = "Credit Card Balance ($)",
+       y = "Marginal Effect (∂P/∂Balance)") +
+  theme_minimal()
+```
+
+**Key Insights**:
+
+1. **AME** = `r round(ame, 6)`: On average across all customers, a $1 increase in balance increases default probability by `r round(ame * 100, 4)`%
+
+2. **MEM** = `r round(mem, 6)`: For a customer with the average balance ($`r round(mean_balance, 2)`), a $1 increase increases default probability by `r round(mem * 100, 4)`%
+
+3. **Why MEM < AME**: The mean balance corresponds to a low default probability (only `r round(mean_prob * 100, 2)`%), where the marginal effect is small. AME includes observations with higher probabilities where marginal effects are larger.
+
+4. **Practical interpretation**: Most analysts report AME because it represents the average treatment effect across the population, which is more policy-relevant than the effect at one specific point.
+
+### Odds Ratio Interpretation
+
+```{r odds-ratio}
+# Calculate odds ratio for a $100 increase in balance
+odds_ratio_100 <- exp(logit_coef[2] * 100)
+
+# Create interpretation table
+or_table <- data.frame(
+  Balance_Increase = c(1, 100, 500),
+  Odds_Ratio = exp(logit_coef[2] * c(1, 100, 500))
+)
+
+kable(or_table, 
+      caption = "Odds Ratios for Different Balance Increases",
+      digits = 3,
+      col.names = c("Balance Increase ($)", "Odds Ratio")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+For a \\$100 increase in balance, the odds of default multiply by `r round(odds_ratio_100, 2)`. For a \\$500 increase, the odds multiply by `r round(exp(logit_coef[2] * 500), 2)`.
+
+### Multiple Predictors Example
+
+```{r multiple-predictors}
+# Fit logistic model with multiple predictors
+logit_full <- glm(default_binary ~ balance + income + student_binary, 
+                  data = Default, family = binomial)
+
+summary(logit_full)
+
+# Calculate marginal effects for all variables
+Default$fitted_prob_full <- predict(logit_full, type = "response")
+
+# Marginal effects
+me_balance <- mean(logit_full$coefficients[2] * Default$fitted_prob_full * 
+                    (1 - Default$fitted_prob_full))
+me_income <- mean(logit_full$coefficients[3] * Default$fitted_prob_full * 
+                   (1 - Default$fitted_prob_full))
+me_student <- mean(logit_full$coefficients[4] * Default$fitted_prob_full * 
+                    (1 - Default$fitted_prob_full))
+
+# Summary of marginal effects
+me_full <- data.frame(
+  Variable = c("Balance", "Income", "Student"),
+  Coefficient = coef(logit_full)[2:4],
+  Odds_Ratio = exp(coef(logit_full)[2:4]),
+  Avg_Marginal_Effect = c(me_balance, me_income, me_student)
+)
+
+kable(me_full, 
+      caption = "Full Model: Coefficients, Odds Ratios, and Marginal Effects",
+      digits = 6) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Interpretation**:
+
+- **Balance**: Each \\$1 increase in balance increases log-odds of default by `r round(coef(logit_full)[2], 5)`, or multiplies odds by `r round(exp(coef(logit_full)[2]), 4)`. Average marginal effect: probability increases by `r round(me_balance, 6)` per dollar.
+
+- **Income**: Higher income slightly reduces default probability (negative coefficient).
+
+- **Student**: Being a student has a `r ifelse(coef(logit_full)[4] < 0, "negative", "positive")` effect on default probability, holding balance and income constant.
+
+### Model Comparison and Diagnostics
+
+```{r model-diagnostics}
+# Compare predictions
+pred_comparison <- data.frame(
+  Actual = Default$default_binary,
+  LPM = predict(lpm_model),
+  Logistic = predict(logit_model, type = "response")
+)
+
+# Calculate correlation with actual outcomes
+cor_lpm <- cor(pred_comparison$Actual, pred_comparison$LPM)
+cor_logistic <- cor(pred_comparison$Actual, pred_comparison$Logistic)
+
+# Root Mean Squared Error
+rmse_lpm <- sqrt(mean((pred_comparison$Actual - pred_comparison$LPM)^2))
+rmse_logistic <- sqrt(mean((pred_comparison$Actual - pred_comparison$Logistic)^2))
+
+# Create comparison table
+performance_table <- data.frame(
+  Model = c("LPM", "Logistic"),
+  Correlation = c(cor_lpm, cor_logistic),
+  RMSE = c(rmse_lpm, rmse_logistic)
+)
+
+kable(performance_table, 
+      caption = "Model Performance Comparison",
+      digits = 4,
+      col.names = c("Model", "Correlation with Actual", "RMSE")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+Both models perform similarly in terms of correlation and RMSE. The main advantages of logistic regression are:
+
+1. Predictions always fall in [0,1]
+2. More realistic at extreme values
+3. Better theoretical foundation for binary outcomes
+
+### Visualizing Marginal Effects
+
+```{r visualize-marginal-effects}
+# Create a grid of balance values
+balance_seq <- seq(0, 3000, length.out = 100)
+
+# Calculate probability and marginal effect at each point
+me_data <- data.frame(
+  balance = balance_seq,
+  probability = predict(logit_model, 
+                       newdata = data.frame(balance = balance_seq), 
+                       type = "response")
+)
+
+me_data$marginal_effect <- logit_coef[2] * me_data$probability * 
+                           (1 - me_data$probability)
+
+# Create two plots
+p1 <- ggplot(me_data, aes(x = balance, y = probability)) +
+  geom_line(color = "blue", size = 1.2) +
+  labs(title = "Predicted Probability of Default",
+       x = "Balance ($)",
+       y = "P(Default = 1)") +
+  theme_minimal()
+
+p2 <- ggplot(me_data, aes(x = balance, y = marginal_effect)) +
+  geom_line(color = "red", size = 1.2) +
+  labs(title = "Marginal Effect of Balance",
+       x = "Balance ($)",
+       y = "∂P/∂Balance") +
+  theme_minimal()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+The marginal effect is highest where the probability is around 0.5 and decreases at the extremes. This demonstrates why logistic regression coefficients cannot be interpreted as constant marginal effects.
+
+## Classification and Model Evaluation
+
+So far, we've focused on estimating probabilities. But often, we need to make **binary classifications**: Is this customer likely to default or not? Will this patient respond to treatment or not?
+
+To classify, we need to convert probabilities into binary predictions using a **threshold** (or cutoff). Understanding classification performance is crucial for practical applications.
+
+### Classification Threshold
+
+Given a predicted probability $\hat{p}_i = P(Y_i=1|X_i)$, we classify:
+
+$$\hat{Y}_i = \begin{cases} 
+1 & \text{if } \hat{p}_i \geq \text{threshold} \\
+0 & \text{if } \hat{p}_i < \text{threshold}
+\end{cases}$$
+
+The **default threshold is 0.5**, but this isn't always optimal. The choice depends on:
+- The cost of false positives vs false negatives
+- The base rate of the outcome
+- Business/policy objectives
+
+### Confusion Matrix
+
+A **confusion matrix** summarizes classification performance:
+
+|                          | **Actual: Default** | **Actual: No Default** |
+|--------------------------|---------------------|------------------------|
+| **Predicted: Default**   | True Positive (TP)  | False Positive (FP)    |
+| **Predicted: No Default**| False Negative (FN) | True Negative (TN)     |
+
+**Definitions**:
+  
+- **True Positive (TP)**: Correctly predicted default 
+- **True Negative (TN)**: Correctly predicted no default 
+- **False Positive (FP)**: Predicted default, but didn't default (Type I error) 
+- **False Negative (FN)**: Predicted no default, but did default (Type II error) 
+
+### Classification Metrics
+
+From the confusion matrix, we calculate:
+
+**1. Accuracy**: Overall correctness
+$$\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}$$
+
+**2. Precision** (Positive Predictive Value): When we predict default, how often are we right?
+$$\text{Precision} = \frac{TP}{TP + FP}$$
+
+**3. Recall** (Sensitivity, True Positive Rate): Of all actual defaults, what proportion do we catch?
+$$\text{Recall} = \frac{TP}{TP + FN}$$
+
+**4. Specificity** (True Negative Rate): Of all non-defaults, what proportion do we correctly identify?
+$$\text{Specificity} = \frac{TN}{TN + FP}$$
+
+**5. F1-Score**: Harmonic mean of precision and recall
+$$\text{F1} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$$
+
+#### Understanding the Harmonic Mean in F1-Score
+
+The F1-Score uses the **harmonic mean** rather than the simple arithmetic mean. The harmonic mean has a special mathematical property that makes it ideal for evaluating classification models:
+
+$$\text{Harmonic Mean}(a, b) = \frac{2ab}{a + b}$$
+
+**Key Property: The harmonic mean is dominated by the smaller number.**
+
+If either precision or recall is low, the harmonic mean becomes low. This prevents models from "gaming" the metric by optimizing only one measure.
+
+**Example 1: Extreme Imbalance**
+
+- Precision = 1.0 (perfect)
+- Recall = 0.0 (catches nothing)
+- **Arithmetic mean** = $(1.0 + 0.0)/2 = 0.5$ (misleadingly suggests 50% performance!)
+- **F1-Score (harmonic mean)** = $\frac{2 \times 1.0 \times 0.0}{1.0 + 0.0} = 0.0$ ✓ (correctly punishes the model)
+
+**Example 2: Moderate Imbalance**
+
+- Precision = 0.9 (excellent)
+- Recall = 0.1 (poor - misses 90% of positives)
+- **Arithmetic mean** = $(0.9 + 0.1)/2 = 0.5$ (suggests decent performance)
+- **F1-Score (harmonic mean)** = $\frac{2 \times 0.9 \times 0.1}{0.9 + 0.1} = 0.18$ ✓ (reflects true weakness)
+
+**Why This Matters:**
+
+The F1-Score becomes high **only if both precision AND recall are high**. This "harmonic balance" ensures that:
+
+- A model cannot achieve a good F1 by excelling at one metric while ignoring the other
+- The metric reflects the true ability to correctly identify positive cases (recall) while maintaining accuracy in those predictions (precision)
+- It's more stringent than arithmetic mean, providing a realistic assessment of model performance on the positive class
+
+### Applying to Our Default Example
+
+Let's evaluate our logistic regression model's classification performance:
+
+```{r classification-metrics}
+# Use 0.5 threshold to classify
+Default$predicted_class_05 <- ifelse(Default$fitted_prob > 0.5, 1, 0)
+
+# Create confusion matrix - convert to factors with "1" first so TP appears at [1,1]
+confusion_05 <- table(Predicted = factor(Default$predicted_class_05, levels = c("1", "0")),
+                      Actual = factor(Default$default_binary, levels = c("1", "0")))
+
+# Display confusion matrix
+kable(confusion_05,
+      caption = "Confusion Matrix (Threshold = 0.5)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Calculate metrics - updated for new orientation: TP at [1,1]
+TP <- confusion_05[1, 1]
+TN <- confusion_05[2, 2]
+FP <- confusion_05[1, 2]
+FN <- confusion_05[2, 1]
+
+accuracy <- (TP + TN) / sum(confusion_05)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)
+specificity <- TN / (TN + FP)
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Create metrics table
+metrics_05 <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", 
+             "Specificity", "F1-Score"),
+  Value = round(c(accuracy, precision, recall, specificity, f1_score), 4),
+  Interpretation = c(
+    paste0(round(accuracy*100, 1), "% of predictions are correct"),
+    paste0(round(precision*100, 1), "% of predicted defaults are actual defaults"),
+    paste0(round(recall*100, 1), "% of actual defaults are caught"),
+    paste0(round(specificity*100, 1), "% of non-defaults are correctly identified"),
+    "Balance between precision and recall"
+  )
+)
+
+kable(metrics_05,
+      caption = "Classification Metrics (Threshold = 0.5)",
+      col.names = c("Metric", "Value", "Interpretation")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Observations**:
+  
+- High accuracy (~`r round(accuracy*100, 1)`%) but this can be misleading with imbalanced data 
+- Very high specificity - we're good at identifying non-defaults 
+- Lower recall - we miss some defaults (false negatives)
+- Precision shows that when we predict default, we're often wrong (many false positives)
+- F1-Score (~`r round(f1_score, 3)`) is the harmonic mean of precision and recall, ranging from 0 (worst) to 1 (best). This low score indicates poor performance on the positive class (defaults), reflecting the model's struggle to simultaneously achieve high precision and high recall for the minority class. In practice, F1 > 0.7 is considered good, while our score suggests the model needs improvement or threshold adjustment
+
+### Threshold Selection: Trade-offs
+
+The 0.5 threshold isn't always optimal. Let's explore different thresholds:
+
+```{r threshold-comparison, fig.height=8}
+# Function to calculate metrics for any threshold
+calc_metrics <- function(actual, predicted_prob, threshold) {
+  predicted_class <- ifelse(predicted_prob > threshold, 1, 0)
+  cm <- table(Predicted = factor(predicted_class, levels = c("1", "0")), 
+              Actual = factor(actual, levels = c("1", "0")))
+  
+  # Handle cases where confusion matrix isn't 2x2
+  # Initialize all counts to 0
+  TP <- 0
+  TN <- 0
+  FP <- 0
+  FN <- 0
+  
+  # Fill in values that exist in the confusion matrix - updated for new orientation
+  # TP at [1,1], FP at [1,2], FN at [2,1], TN at [2,2]
+  if ("1" %in% rownames(cm) && "1" %in% colnames(cm)) TP <- cm["1", "1"]
+  if ("1" %in% rownames(cm) && "0" %in% colnames(cm)) FP <- cm["1", "0"]
+  if ("0" %in% rownames(cm) && "1" %in% colnames(cm)) FN <- cm["0", "1"]
+  if ("0" %in% rownames(cm) && "0" %in% colnames(cm)) TN <- cm["0", "0"]
+  
+  accuracy <- (TP + TN) / sum(cm)
+  # Handle division by zero
+  precision <- ifelse((TP + FP) > 0, TP / (TP + FP), 0)
+  recall <- ifelse((TP + FN) > 0, TP / (TP + FN), 0)
+  specificity <- ifelse((TN + FP) > 0, TN / (TN + FP), 0)
+  f1 <- ifelse((precision + recall) > 0, 
+               2 * (precision * recall) / (precision + recall), 0)
+  
+  return(data.frame(
+    threshold = threshold,
+    accuracy = accuracy,
+    precision = precision,
+    recall = recall,
+    specificity = specificity,
+    f1_score = f1
+  ))
+}
+
+# Calculate metrics for various thresholds
+thresholds <- seq(0.01, 0.99, by = 0.01)
+metrics_df <- do.call(rbind, lapply(thresholds, function(t) {
+  calc_metrics(Default$default_binary, Default$fitted_prob, t)
+}))
+
+# Plot metrics across thresholds
+metrics_long <- metrics_df %>%
+  pivot_longer(cols = c(accuracy, precision, recall, specificity, f1_score),
+               names_to = "metric", values_to = "value")
+
+ggplot(metrics_long, aes(x = threshold, y = value, color = metric)) +
+  geom_line(size = 1.2) +
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "black") +
+  labs(title = "Classification Metrics vs Threshold",
+       subtitle = "Dashed line shows default threshold of 0.5",
+       x = "Classification Threshold",
+       y = "Metric Value",
+       color = "Metric") +
+  scale_color_brewer(palette = "Set1",
+                     labels = c("Accuracy", "F1-Score", "Precision", 
+                                "Recall", "Specificity")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Key Insights**:
+
+1. **Recall decreases** as threshold increases (we catch fewer defaults)
+2. **Precision increases** as threshold increases (fewer false alarms)
+3. **Trade-off**: Higher threshold = fewer false positives but more false negatives
+4. **F1-Score** balances precision and recall
+
+### Finding the Optimal Threshold
+
+The "optimal" threshold depends on your objective. Common approaches:
+
+**1. Maximize F1-Score** (balance precision and recall)
+
+```{r optimal-f1}
+# Find threshold that maximizes F1
+optimal_f1_idx <- which.max(metrics_df$f1_score)
+optimal_f1_threshold <- metrics_df$threshold[optimal_f1_idx]
+optimal_f1_value <- metrics_df$f1_score[optimal_f1_idx]
+
+# Calculate confusion matrix at optimal threshold
+Default$predicted_optimal <- ifelse(Default$fitted_prob > optimal_f1_threshold, 1, 0)
+confusion_optimal <- table(Predicted = factor(Default$predicted_optimal, levels = c("1", "0")),
+                           Actual = factor(Default$default_binary, levels = c("1", "0")))
+
+kable(confusion_optimal,
+      caption = paste0("Confusion Matrix (Optimal Threshold = ", 
+                       round(optimal_f1_threshold, 3), ")")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+The optimal threshold for F1-score is **`r round(optimal_f1_threshold, 3)`**, which gives F1 = `r round(optimal_f1_value, 4)`.
+
+**2. Balance Sensitivity and Specificity** (where curves intersect)
+
+Another approach is to find the threshold where **sensitivity (recall) equals specificity**—the point where the two curves intersect. This represents a balanced trade-off between two competing objectives:
+
+- **Sensitivity (Recall)**: How well we identify actual positives (defaults)
+- **Specificity**: How well we identify actual negatives (non-defaults)
+
+**What Does the Intersection Mean?**
+
+At the intersection point, the model performs equally well at:
+- Catching actual defaults (True Positive Rate = Sensitivity)
+- Correctly identifying non-defaults (True Negative Rate = Specificity)
+
+This threshold represents **equal treatment of both classes** rather than focusing primarily on the positive class (as F1 does).
+
+**When to Use This Approach:**
+
+This balanced threshold is appropriate when:
+
+1. **Equal error costs**: False positives and false negatives have similar consequences
+2. **Fairness considerations**: You want to treat both classes (default/non-default) equally
+3. **No class preference**: Neither class is inherently more important
+4. **Symmetric decision-making**: Equal concern for Type I and Type II errors
+
+**Comparison with F1-Score Optimization:**
+
+| Criterion | F1-Score | Sensitivity-Specificity Balance |
+|-----------|----------|--------------------------------|
+| **Focus** | Positive class only (Precision + Recall) | Both classes equally (TP rate + TN rate) |
+| **When to use** | Imbalanced data, care most about minority class | Balanced importance of both classes |
+| **Interpretation** | How well we handle positives | How balanced our errors are across classes |
+| **Typical threshold** | Often < 0.5 for rare events | Closer to 0.5 for balanced problems |
+
+Let's visualize this balance:
+
+```{r sensitivity-specificity-plot, fig.height=6}
+# Find the intersection point where Sensitivity = Specificity
+# This minimizes abs(recall - specificity)
+metrics_df$diff <- abs(metrics_df$recall - metrics_df$specificity)
+intersection_idx <- which.min(metrics_df$diff)
+intersection_threshold <- metrics_df$threshold[intersection_idx]
+intersection_value <- metrics_df$recall[intersection_idx]
+
+# Plot sensitivity vs specificity
+ggplot(metrics_df, aes(x = threshold)) +
+  geom_line(aes(y = recall, color = "Sensitivity (Recall)"), size = 1.2) +
+  geom_line(aes(y = specificity, color = "Specificity"), size = 1.2) +
+  # Add intersection point (where Sensitivity = Specificity)
+  geom_vline(xintercept = intersection_threshold, linetype = "dotted", 
+             color = "darkgreen", size = 1.2) +
+  geom_point(x = intersection_threshold, y = intersection_value, 
+             color = "darkgreen", size = 4) +
+  # Add F1 optimal for comparison
+  geom_vline(xintercept = optimal_f1_threshold, linetype = "dashed", 
+             color = "blue", size = 1) +
+  annotate("text", x = intersection_threshold - 0.02, y = 0.85,
+           label = paste0("Intersection:\nSens = Spec\n@ ", round(intersection_threshold, 3)),
+           hjust = 1, color = "darkgreen", fontface = "bold", size = 3.5) +
+  annotate("text", x = optimal_f1_threshold + 0.02, y = 0.3,
+           label = paste0("Optimal F1\n@ ", round(optimal_f1_threshold, 3)),
+           hjust = 0, color = "blue", size = 3.5) +
+  labs(title = "Sensitivity vs Specificity Trade-off",
+       subtitle = paste0("Green dot: Intersection (Sens=Spec=", round(intersection_value, 3), 
+                        ") | Blue line: F1-optimal (different objective)"),
+       x = "Classification Threshold",
+       y = "Rate",
+       color = NULL) +
+  scale_color_manual(values = c("Sensitivity (Recall)" = "darkred", 
+                                 "Specificity" = "darkgreen")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.subtitle = element_text(size = 9))
+```
+
+**Key Insight:** The intersection occurs at threshold ≈ `r round(intersection_threshold, 3)`, where both Sensitivity and Specificity equal approximately `r round(intersection_value, 3)`. This is found by **minimizing** the absolute difference `|Sensitivity - Specificity|`. The F1-optimal threshold (≈`r round(optimal_f1_threshold, 3)`) is different because it optimizes a different objective (harmonic mean of precision and recall).
+
+### Decision Framework: Which Threshold Criterion to Use?
+
+Both approaches give different thresholds because they optimize **different objectives**. Here's how to choose:
+
+#### Understanding the Fundamental Difference
+
+```{r threshold-criteria-comparison, echo=FALSE}
+# Create comprehensive comparison table
+criteria_comparison <- data.frame(
+  Criterion = c("Max F1-Score", "Min abs(Sens - Spec)"),
+  Optimizes = c("Harmonic mean of Precision & Recall", "Equal Sensitivity & Specificity"),
+  Focus = c("Positive class only", "Both classes equally"),
+  Metrics_Balanced = c("Precision + Recall (both about positives)", "True Positive Rate + True Negative Rate"),
+  Best_For = c("Imbalanced data, minority class matters most", "Balanced importance of both classes"),
+  Ignores = c("How well we identify negatives (Specificity)", "Neither - treats both equally"),
+  Typical_Threshold = c("Often << 0.5 for rare events", "Closer to 0.5 for balanced problems"),
+  Example_Use_Cases = c("Fraud detection, disease screening, rare events", "Hiring fairness, balanced loan decisions")
+)
+
+kable(criteria_comparison,
+      caption = "Threshold Selection Criteria: F1-Score vs Sensitivity-Specificity Balance",
+      col.names = c("Criterion", "What It Optimizes", "Focus", "Metrics Balanced", 
+                    "Best For", "What It Ignores", "Typical Threshold", "Example Use Cases")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                full_width = TRUE, font_size = 11) %>%
+  column_spec(1, bold = TRUE, width = "12em") %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#3498db")
+```
+
+#### When to Use Each Approach
+
+**Use MAX F1-SCORE when:**
+  
+1. **Imbalanced data** (e.g., 1% positive class, 99% negative)
+  
+   - Example: Credit card fraud (rare frauds among millions of transactions) 
+   - Why: F1 focuses on the minority class you care about 
+
+2. **Positive class is critical**
+  
+   - Example: Disease diagnosis - missing a sick patient (FN) is costly 
+   - Why: F1 ensures you catch positives while maintaining precision 
+
+3. **Asymmetric interest** - you primarily care about one outcome
+  
+   - Example: Spam detection - focus on catching spam (positive class) 
+   - Why: Specificity (correctly identifying non-spam) is less critical 
+
+4. **Evaluation focuses on minority class performance**
+  
+   - Example: Rare event prediction, anomaly detection 
+   - Why: Accuracy would be misleadingly high (99% by predicting all negative) 
+
+**Use MIN |SENSITIVITY - SPECIFICITY| when:**
+  
+1. **Both classes are equally important**
+
+   - Example: Medical test where both false alarms AND missed cases matter 
+   - Why: Want equal performance on detecting disease AND ruling it out 
+
+2. **Fairness considerations**
+  
+   - Example: Hiring decisions (must be fair to both hired/not hired candidates) 
+   - Why: Regulatory requirements for equal error rates 
+   
+3. **Balanced costs** - false positives and false negatives cost similarly
+  
+   - Example: Resource allocation where over-allocation and under-allocation are equally problematic 
+   - Why: Symmetric loss function 
+   
+4. **Symmetric decision-making**
+  
+   - Example: Quality control where accepting bad items = rejecting good items in cost 
+   - Why: No inherent preference for one type of error 
+
+#### Real-World Examples with Recommendations
+
+```{r decision-examples,echo=FALSE}
+# Create decision scenarios table
+decision_scenarios <- data.frame(
+  Scenario = c(
+    "Cancer Screening",
+    "Credit Card Fraud",
+    "Loan Default Prediction",
+    "Spam Email Filter",
+    "Job Applicant Screening",
+    "COVID-19 Testing",
+    "Customer Churn",
+    "A/B Test Winner Selection"
+  ),
+  Class_Balance = c("1-5% positive", "0.1% positive", "3% positive", "10-30% spam",
+                    "~50% hired", "Varies by outbreak", "10-20% churn", "~50-50"),
+  Primary_Concern = c(
+    "Missing cancer (FN)",
+    "Missing fraud (FN)", 
+    "Loan defaults (FN)",
+    "Catching spam (FN)",
+    "Fair to both groups",
+    "Missing cases (FN) early; both later",
+    "Identifying churners",
+    "Fair comparison"
+  ),
+  Recommended_Criterion = c(
+    "Max F1", "Max F1", "Cost-based (likely low threshold)", "Max F1",
+    "Min bas(Sens-Spec)", "Max F1 initially; Min abs(S-S) later", "Max F1", "Min abs(Sens-Spec)"
+  ),
+  Reasoning = c(
+    "Rare disease, catch cases even with some false alarms",
+    "Extremely rare, must catch fraud despite false positives",
+    "Defaults costly but false rejections lose customers",
+    "Imbalanced, focus on catching spam",
+    "Legal fairness requirements, balanced classes",
+    "Early: catch cases. Later: test accuracy for both",
+    "Imbalanced, retain customers who might churn",
+    "No preference for either variant, fair evaluation"
+  )
+)
+
+kable(decision_scenarios,
+      caption = "Threshold Selection: Real-World Decision Guide",
+      col.names = c("Scenario", "Class Balance", "Primary Concern", 
+                    "Recommended Criterion", "Reasoning")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                full_width = TRUE, font_size = 10) %>%
+  column_spec(1, bold = TRUE, width = "10em") %>%
+  column_spec(4, bold = TRUE, color = "white", background = "#27ae60")
+```
+
+#### The Class Imbalance Factor
+
+For our credit card default example:
+  
+- **Actual default rate**: `r round(mean(Default$default_binary) * 100, 1)`% (highly imbalanced!) 
+- **F1-optimal threshold**: `r round(optimal_f1_threshold, 3)` (prioritizes catching the rare defaults) 
+- **Intersection threshold**: `r round(intersection_threshold, 3)` (treats both classes equally) 
+
+**Why such a difference?**
+
+With only `r round(mean(Default$default_binary) * 100, 1)`% defaults, the intersection point occurs at a very low threshold where we're casting a wide net to achieve balance. The F1-optimal threshold is higher because it focuses specifically on the performance on defaults (the minority class we care about), accepting that we'll have high specificity regardless.
+
+**Rule of Thumb:**
+  
+- **Class imbalance < 20%**: Strongly consider Max F1 (unless fairness mandates otherwise) 
+- **Class imbalance 40-60%**: Min |Sens-Spec| often appropriate 
+- **Always**: Consider business costs! Cost-based optimization (see next section) often dominates 
+
+### Business Context Matters
+
+The optimal threshold depends on the **costs of errors**:
+
+**Example 1: Loan Default Prediction**
+  
+- **False Negative** (miss a default): Lose the entire loan amount 
+- **False Positive** (reject good customer): Lose potential interest income 
+- If loss from FN >> loss from FP → Use **lower threshold** (catch more defaults) 
+
+**Example 2: Medical Screening**
+  
+- **False Negative** (miss a disease): Patient doesn't get treatment 
+- **False Positive** (false alarm): Unnecessary follow-up tests 
+- If FN is life-threatening → Use **lower threshold** (higher sensitivity) 
+
+```{r cost-based-threshold}
+# Suppose: Cost of FN = $10,000, Cost of FP = $100
+cost_fn <- 10000
+cost_fp <- 100
+
+# Calculate expected cost for each threshold
+metrics_df <- metrics_df %>%
+  mutate(
+    total_defaults = sum(Default$default_binary),
+    total_non_defaults = sum(1 - Default$default_binary),
+    fn_count = total_defaults * (1 - recall),
+    fp_count = total_non_defaults * (1 - specificity),
+    expected_cost = fn_count * cost_fn + fp_count * cost_fp
+  )
+
+# Find cost-minimizing threshold
+optimal_cost_idx <- which.min(metrics_df$expected_cost)
+optimal_cost_threshold <- metrics_df$threshold[optimal_cost_idx]
+optimal_cost <- metrics_df$expected_cost[optimal_cost_idx]
+
+# Display optimal thresholds summary
+threshold_summary <- data.frame(
+  Objective = c("Default (0.5)", "Maximize F1-Score", 
+                "Minimize Expected Cost (FN=$10K, FP=$100)"),
+  Threshold = c(0.5, optimal_f1_threshold, optimal_cost_threshold),
+  F1_Score = c(
+    metrics_df$f1_score[metrics_df$threshold == 0.5],
+    optimal_f1_value,
+    metrics_df$f1_score[optimal_cost_idx]
+  ),
+  Expected_Cost = c(
+    metrics_df$expected_cost[metrics_df$threshold == 0.5],
+    metrics_df$expected_cost[optimal_f1_idx],
+    optimal_cost
+  )
+)
+
+kable(threshold_summary,
+      caption = "Threshold Selection Based on Different Objectives",
+      digits = c(0, 3, 4, 0),
+      col.names = c("Objective", "Threshold", "F1-Score", "Expected Cost ($)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Key Takeaway**: When costs are asymmetric, the optimal threshold shifts. Here, since false negatives are much more costly, the optimal threshold (`r round(optimal_cost_threshold, 3)`) is lower than 0.5, prioritizing sensitivity over specificity.
+
+## When to Use LPM vs Logistic
+
+### Use LPM when:
+  
+1. **Simplicity matters**: Easy interpretation, coefficients are marginal effects 
+2. **Probabilities stay moderate**: When most predictions are between 0.2 and 0.8 
+3. **Quick approximation**: For exploratory analysis or when speed is important 
+4. **Rare events**: When the outcome is very rare, LPM approximates logistic well 
+
+### Use Logistic when:
+  
+1. **Theoretical correctness**: Standard for binary outcomes in most fields 
+2. **Extreme predictions**: When you need predictions near 0 or 1 
+3. **Odds ratios**: When you want to report odds ratios 
+4. **Publication**: Most journals expect logistic for binary outcomes 
+5. **Model comparison**: AIC, BIC, and likelihood ratio tests are available 
+
+# Summary and Key Takeaways
+
+## Part 1: Dummy Variables
+
+1. **Binary dummies**: Coefficient equals mean difference between groups
+2. **Multiple categories**: Use k-1 dummies to avoid the dummy variable trap
+3. **Interactions**: 
+   - Dummy × Continuous: Different slopes for different groups
+   - Dummy × Dummy: Combined effects beyond simple addition
+4. **Connection to t-tests**: Dummy variable regression is equivalent to two-sample t-test
+
+## Part 2: Probability Models
+
+### Linear Probability Model
+
+**Pros**:
+- Simple interpretation: coefficients are marginal effects
+- Easy to estimate (OLS)
+- Good approximation in middle probability ranges
+
+**Cons**:
+- Predictions can fall outside [0,1]
+- Heteroskedasticity (though often not severe)
+- Assumes constant marginal effects
+
+### Logistic Regression
+
+**Pros**:
+- Predictions always in [0,1]
+- Theoretically appropriate for binary outcomes
+- S-shaped probability curve
+- Flexible interpretation (log-odds, odds ratios, marginal effects)
+
+**Cons**:
+- More complex interpretation
+- Requires iterative estimation (MLE)
+- Marginal effects vary with X
+
+### Mathematical Foundations
+
+We covered three key estimation approaches:
+
+1. **OLS/LPM**: Minimize sum of squared residuals
+2. **MLE**: Maximize likelihood of observing the data
+3. **Interpretation**: Link between coefficients, odds ratios, and marginal effects
+
+### Practical Recommendations
+
+1. Start with LPM for quick analysis and interpretation
+2. Use logistic regression for final models and publication
+3. Always report marginal effects (AME or MEM) for logistic models
+4. Visualize predicted probabilities to aid interpretation
+5. Consider model diagnostics and goodness-of-fit measures
+
+# Additional Resources
+
+For further study:
+
+- **Dummy variables**: Understanding interaction terms and their interpretation
+- **Logistic regression**: Probit models as an alternative
+- **Model diagnostics**: ROC curves, confusion matrices, classification metrics
+- **Extensions**: Multinomial logit for outcomes with >2 categories
+- **Panel data**: Fixed effects with dummy variables
+
+---
+
+**End of Lesson: Dummy Variables and Probability Models**

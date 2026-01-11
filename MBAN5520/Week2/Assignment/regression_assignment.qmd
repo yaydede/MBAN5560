@@ -1,0 +1,878 @@
+---
+title: "Regression Analysis Assignment"
+subtitle: "Predicting House Prices: A Practical Application of Linear Regression"
+author: "MBAN5520 - Statistics"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(corrplot)
+library(GGally)
+library(broom)
+library(car)  # for VIF and other diagnostics
+
+# Set seed for reproducibility
+set.seed(5520)
+```
+
+# Introduction
+
+## Assignment Objectives
+
+In this assignment, you will apply regression analysis concepts to predict house sale prices using the Ames Housing dataset. This practical exercise will help you:
+
+- Understand data preprocessing and preparation
+- Conduct exploratory data analysis
+- Build and interpret linear regression models
+- Assess model quality using statistical metrics
+- Make predictions and quantify uncertainty
+
+## Dataset: Ames Housing Data
+
+The Ames Housing dataset contains information about residential home sales in Ames, Iowa from 2006 to 2010. It includes 80+ variables describing various aspects of residential homes.
+
+**Key Variables:**
+
+- `SalePrice`: Sale price of the house (target variable)
+- `Gr.Liv.Area`: Above grade living area (square feet)
+- `Overall.Qual`: Overall material and finish quality (1-10)
+- `Year.Built`: Original construction year
+- `Garage.Cars`: Size of garage in car capacity
+- `Full.Bath`: Number of full bathrooms
+- `Total.Bsmt.SF`: Total square feet of basement area
+- `Neighborhood`: Physical locations within Ames
+- And many more...
+
+---
+
+# Data Loading and Preprocessing
+
+## Load the Dataset
+
+First, let's load the data and inspect its structure by looking at the first 10 rows:
+
+```{r load-data}
+# Load the Ames Housing dataset
+housing_data <- read.csv("../AmesHousing.csv")
+
+# Display dimensions
+cat("Dataset dimensions:", dim(housing_data)[1], "rows and", 
+    dim(housing_data)[2], "columns\n")
+
+# View first 10 rows only (as instructed)
+head(housing_data, 10)
+```
+
+## Data Structure Inspection
+
+```{r data-structure}
+# Check column names
+cat("Total number of variables:", ncol(housing_data), "\n\n")
+
+# Display variable types
+str(housing_data, give.attr = FALSE)
+```
+
+## Data Preprocessing
+
+```{r preprocessing}
+# Select relevant variables for our analysis
+# Focus on interpretable variables that explain house prices
+housing_clean <- housing_data %>%
+  select(
+    SalePrice,           # Target variable
+    Gr.Liv.Area,        # Living area
+    Overall.Qual,       # Overall quality
+    Year.Built,         # Year built
+    Garage.Cars,        # Garage capacity
+    Full.Bath,          # Number of full bathrooms
+    Total.Bsmt.SF,      # Basement area
+    Neighborhood,       # Location
+    Lot.Area,           # Lot size
+    Bedroom.AbvGr,      # Number of bedrooms
+    Year.Remod.Add      # Remodel year
+  )
+
+# Check for missing values
+missing_summary <- housing_clean %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Missing_Count")
+
+kable(missing_summary, 
+      caption = "Missing Values Summary") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Handle missing values (simple approach: remove rows with any NA)
+housing_clean <- housing_clean %>%
+  drop_na()
+
+cat("\nDataset after removing missing values:", 
+    nrow(housing_clean), "observations\n")
+
+# Create a variable for house age
+housing_clean <- housing_clean %>%
+  mutate(HouseAge = max(Year.Built) - Year.Built)
+```
+
+### **Question 1.1**: How many observations were removed due to missing values?
+
+**Answer:** [Students should calculate: original rows - clean rows]
+
+---
+
+# Exploratory Data Analysis
+
+## Summary Statistics
+
+```{r summary-stats}
+# Summary statistics for numeric variables
+summary_stats <- housing_clean %>%
+  select(where(is.numeric)) %>%
+  summary()
+
+print(summary_stats)
+```
+
+### **Question 2.1**: What is the mean sale price of houses in this dataset? What is the standard deviation?
+
+**Answer:** [Students should extract from summary or calculate separately]
+
+```{r price-stats}
+# Detailed price statistics
+price_summary <- housing_clean %>%
+  summarise(
+    Mean = mean(SalePrice),
+    Median = median(SalePrice),
+    SD = sd(SalePrice),
+    Min = min(SalePrice),
+    Max = max(SalePrice),
+    Q25 = quantile(SalePrice, 0.25),
+    Q75 = quantile(SalePrice, 0.75)
+  )
+
+kable(price_summary, digits = 0,
+      caption = "Sale Price Statistics (in dollars)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Distribution of Sale Price
+
+```{r price-distribution, fig.height=6}
+# Histogram and density plot
+p1 <- ggplot(housing_clean, aes(x = SalePrice)) +
+  geom_histogram(aes(y = ..density..), bins = 50, 
+                 fill = "lightblue", color = "darkblue", alpha = 0.7) +
+  geom_density(color = "red", linewidth = 1.2) +
+  scale_x_continuous(labels = scales::dollar) +
+  labs(title = "Distribution of Sale Prices",
+       x = "Sale Price", y = "Density") +
+  theme_minimal()
+
+# Q-Q plot to check normality
+p2 <- ggplot(housing_clean, aes(sample = SalePrice)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot of Sale Prices",
+       x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+library(patchwork)
+p1 / p2
+```
+
+### **Question 2.2**: Does the sale price appear to follow a normal distribution? What does the Q-Q plot suggest?
+
+**Answer:** [Students should comment on skewness and normality]
+
+## Correlation Analysis
+
+```{r correlation-matrix, fig.height=8}
+# Select numeric variables for correlation
+numeric_vars <- housing_clean %>%
+  select(SalePrice, Gr.Liv.Area, Overall.Qual, Year.Built, 
+         Garage.Cars, Full.Bath, Total.Bsmt.SF, Lot.Area, 
+         Bedroom.AbvGr, HouseAge)
+
+# Correlation matrix
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+
+# Visualize correlation matrix
+corrplot(cor_matrix, method = "color", type = "upper",
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.7,
+         title = "Correlation Matrix of Housing Variables",
+         mar = c(0, 0, 2, 0))
+```
+
+### **Question 2.3**: Which three variables show the strongest correlation with SalePrice?
+
+**Answer:** [Students should identify top 3 correlations]
+
+## Scatter Plots of Key Predictors
+
+```{r scatter-plots, fig.height=10}
+# Create scatter plots for key predictors
+p1 <- ggplot(housing_clean, aes(x = Gr.Liv.Area, y = SalePrice)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  geom_smooth(method = "lm", color = "red", se = TRUE) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Living Area vs Sale Price",
+       x = "Above Grade Living Area (sq ft)", y = "Sale Price") +
+  theme_minimal()
+
+p2 <- ggplot(housing_clean, aes(x = Overall.Qual, y = SalePrice)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_smooth(method = "lm", color = "red", se = TRUE) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Overall Quality vs Sale Price",
+       x = "Overall Quality Rating", y = "Sale Price") +
+  theme_minimal()
+
+p3 <- ggplot(housing_clean, aes(x = Year.Built, y = SalePrice)) +
+  geom_point(alpha = 0.5, color = "purple") +
+  geom_smooth(method = "lm", color = "red", se = TRUE) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Year Built vs Sale Price",
+       x = "Year Built", y = "Sale Price") +
+  theme_minimal()
+
+p4 <- ggplot(housing_clean, aes(x = factor(Garage.Cars), y = SalePrice)) +
+  geom_boxplot(fill = "lightcoral", alpha = 0.7) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Garage Capacity vs Sale Price",
+       x = "Garage Cars", y = "Sale Price") +
+  theme_minimal()
+
+(p1 + p2) / (p3 + p4)
+```
+
+### **Question 2.4**: Based on the scatter plots, which variable appears to have the strongest linear relationship with sale price?
+
+**Answer:** [Students should analyze the plots]
+
+---
+
+# Building the Regression Model
+
+## Model Specification
+
+We will build a multiple linear regression model to explain house sale prices. Our model includes:
+
+**Continuous Predictors:**
+- `GrLivArea`: Living area
+- `OverallQual`: Overall quality rating
+- `YearBuilt`: Year the house was built
+- `TotalBsmtSF`: Basement area
+- `LotArea`: Lot size
+
+**Discrete Predictors:**
+- `GarageCars`: Garage capacity
+- `FullBath`: Number of full bathrooms
+- `BedroomAbvGr`: Number of bedrooms
+
+**Model Formula:**
+$$\text{SalePrice} = \beta_0 + \beta_1 \cdot \text{GrLivArea} + \beta_2 \cdot \text{OverallQual} + \beta_3 \cdot \text{YearBuilt} + ... + \epsilon$$
+
+```{r build-model}
+# Build the multiple regression model
+model1 <- lm(SalePrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+               Garage.Cars + Full.Bath + Total.Bsmt.SF + Lot.Area + Bedroom.AbvGr,
+             data = housing_clean)
+
+# Display model summary
+summary(model1)
+```
+
+---
+
+# Model Estimation and Interpretation
+
+## Regression Coefficients
+
+```{r coefficient-table}
+# Create a tidy coefficient table
+coef_table <- tidy(model1, conf.int = TRUE) %>%
+  mutate(
+    estimate = round(estimate, 2),
+    std.error = round(std.error, 2),
+    statistic = round(statistic, 2),
+    p.value = format.pval(p.value, digits = 3),
+    conf.low = round(conf.low, 2),
+    conf.high = round(conf.high, 2)
+  )
+
+kable(coef_table,
+      col.names = c("Predictor", "Coefficient (β)", "Std. Error", 
+                    "t-statistic", "p-value", "CI Lower", "CI Upper"),
+      caption = "Regression Coefficients with 95% Confidence Intervals") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Interpreting Coefficients
+
+### **Question 4.1**: Interpret the coefficient for `GrLivArea`. What does it tell us?
+
+**Answer:** [Students should interpret: For each additional square foot of living area, the sale price increases by $β dollars, holding all other variables constant]
+
+### **Question 4.2**: Interpret the coefficient for `OverallQual`. Is the effect meaningful?
+
+**Answer:** [Students should interpret the practical significance]
+
+### **Question 4.3**: What is the estimated sale price for a house with the following characteristics?
+- Living area: 2000 sq ft
+- Overall quality: 7
+- Year built: 2000
+- Garage: 2 cars
+- Full bathrooms: 2
+- Basement: 1000 sq ft
+- Lot area: 10000 sq ft
+- Bedrooms: 3
+
+```{r prediction-example}
+# Create a new data point
+new_house <- data.frame(
+  Gr.Liv.Area = 2000,
+  Overall.Qual = 7,
+  Year.Built = 2000,
+  Garage.Cars = 2,
+  Full.Bath = 2,
+  Total.Bsmt.SF = 1000,
+  Lot.Area = 10000,
+  Bedroom.AbvGr = 3
+)
+
+# Predict
+predicted_price <- predict(model1, newdata = new_house)
+cat("Predicted Sale Price: $", format(round(predicted_price), big.mark = ","), "\n")
+```
+
+**Answer:** [Students should calculate or use the prediction above]
+
+---
+
+# Which Factors Affect Price Most?
+
+## Standardized Coefficients
+
+To compare the relative importance of predictors measured in different units, we calculate standardized coefficients (beta coefficients):
+
+```{r standardized-coefficients}
+# Standardize predictors (excluding intercept)
+housing_standardized <- housing_clean %>%
+  mutate(across(c(Gr.Liv.Area, Overall.Qual, Year.Built, Garage.Cars, 
+                  Full.Bath, Total.Bsmt.SF, Lot.Area, Bedroom.AbvGr), 
+                ~scale(.)[,1]))
+
+# Fit model with standardized predictors
+model_std <- lm(SalePrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+                  Garage.Cars + Full.Bath + Total.Bsmt.SF + Lot.Area + Bedroom.AbvGr,
+                data = housing_standardized)
+
+# Extract standardized coefficients
+std_coefs <- tidy(model_std) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    abs_estimate = abs(estimate),
+    estimate = round(estimate, 4)
+  ) %>%
+  arrange(desc(abs_estimate))
+
+kable(std_coefs %>% select(term, estimate, abs_estimate),
+      col.names = c("Predictor", "Standardized β", "|Standardized β|"),
+      caption = "Standardized Coefficients (Ranked by Importance)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Visualizing Coefficient Importance
+
+```{r coef-plot, fig.height=6}
+# Create coefficient plot (extracting coefficients from model1)
+coef_plot_data <- tidy(model1, conf.int = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(term = reorder(term, estimate))
+
+ggplot(coef_plot_data, aes(x = estimate, y = term)) +
+  geom_point(size = 4, color = "darkblue") +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), 
+                 height = 0.2, color = "darkblue") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Regression Coefficients with 95% Confidence Intervals",
+       x = "Coefficient Estimate (β)",
+       y = "Predictor") +
+  theme_minimal()
+```
+
+### **Question 5.1**: Based on standardized coefficients, which three factors have the largest impact on sale price?
+
+**Answer:** [Students should identify top 3 from standardized coefficients]
+
+### **Question 5.2**: Why do we use standardized coefficients to compare variable importance?
+
+**Answer:** [Students should explain that different units make raw coefficients non-comparable]
+
+---
+
+# Statistical Significance and Confidence Intervals
+
+## Understanding Confidence Intervals
+
+The 95% confidence interval for each coefficient tells us the range within which we are 95% confident the true population parameter lies.
+
+### **Question 6.1**: For the `OverallQual` coefficient, what is the 95% confidence interval? What does this mean?
+
+**Answer:** [Students should extract CI and interpret: We are 95% confident that the true effect of overall quality on sale price is between X and Y dollars]
+
+### **Question 6.2**: Does the confidence interval for `BedroomAbvGr` contain zero? What does this imply about statistical significance?
+
+**Answer:** [Students should check if 0 is in CI and relate to significance]
+
+## Statistical Significance Testing
+
+```{r significance-summary}
+# Create significance summary
+sig_summary <- coef_table %>%
+  mutate(
+    Significant = case_when(
+      as.numeric(p.value) < 0.001 ~ "*** (p < 0.001)",
+      as.numeric(p.value) < 0.01 ~ "** (p < 0.01)",
+      as.numeric(p.value) < 0.05 ~ "* (p < 0.05)",
+      as.numeric(p.value) < 0.10 ~ ". (p < 0.10)",
+      TRUE ~ "Not significant"
+    )
+  ) %>%
+  select(term, estimate, p.value, Significant)
+
+kable(sig_summary,
+      col.names = c("Predictor", "Coefficient", "p-value", "Significance"),
+      caption = "Statistical Significance of Predictors") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### **Question 6.3**: Which predictors are statistically significant at the 0.05 level?
+
+**Answer:** [Students should list significant predictors]
+
+### **Question 6.4**: Is there any predictor that is NOT statistically significant? What should we consider doing with it?
+
+**Answer:** [Students should identify non-significant predictors and discuss whether to keep or remove them]
+
+---
+
+# Model Quality Metrics
+
+## R-squared and Adjusted R-squared
+
+```{r r-squared}
+# Extract model statistics
+model_summary <- glance(model1)
+
+cat("R-squared:", round(model_summary$r.squared, 4), "\n")
+cat("Adjusted R-squared:", round(model_summary$adj.r.squared, 4), "\n")
+cat("Residual Standard Error:", round(model_summary$sigma, 2), "\n")
+```
+
+### **Question 7.1**: What percentage of the variation in sale price is explained by our model?
+
+**Answer:** [Students should interpret R²]
+
+### **Question 7.2**: Why is Adjusted R² lower than R²? Which one should we use when comparing models?
+
+**Answer:** [Students should explain the penalty for additional predictors in Adjusted R²]
+
+## F-Statistic
+
+```{r f-test}
+cat("F-statistic:", round(model_summary$statistic, 2), "\n")
+cat("Degrees of freedom:", model_summary$df, "and", model_summary$df.residual, "\n")
+cat("p-value:", format.pval(model_summary$p.value, digits = 3), "\n")
+```
+
+The F-statistic tests the null hypothesis:
+$$H_0: \beta_1 = \beta_2 = ... = \beta_k = 0$$
+
+Against the alternative:
+$$H_1: \text{At least one } \beta_j \neq 0$$
+
+### **Question 7.3**: What does the F-statistic tell us about our model? Is the model statistically significant overall?
+
+**Answer:** [Students should interpret F-test result]
+
+## Residual Analysis
+
+```{r residual-diagnostics, fig.height=10}
+# Create diagnostic plots
+par(mfrow = c(2, 2))
+plot(model1, which = 1:4)
+par(mfrow = c(1, 1))
+```
+
+### **Question 7.4**: Based on the residual plots, does our model satisfy the assumptions of linear regression (linearity, homoscedasticity, normality)?
+
+**Answer:** [Students should analyze each diagnostic plot]
+
+---
+
+# Prediction with Train-Test Split
+
+## Data Splitting
+
+```{r train-test-split}
+# Set seed for reproducibility
+set.seed(5520)
+
+# Create 75-25 train-test split
+train_indices <- sample(1:nrow(housing_clean), 
+                       size = 0.75 * nrow(housing_clean))
+
+train_data <- housing_clean[train_indices, ]
+test_data <- housing_clean[-train_indices, ]
+
+cat("Training set size:", nrow(train_data), "\n")
+cat("Test set size:", nrow(test_data), "\n")
+```
+
+## Build Model on Training Data
+
+```{r train-model}
+# Fit model on training data only
+model_train <- lm(SalePrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+                    Garage.Cars + Full.Bath + Total.Bsmt.SF + Lot.Area + Bedroom.AbvGr,
+                  data = train_data)
+
+summary(model_train)
+```
+
+### **Question 8.1**: Compare the R² from the training model to the full model. Are they similar?
+
+**Answer:** [Students should compare R² values]
+
+## Make Predictions on Test Data
+
+```{r predictions}
+# Make predictions on test set
+test_predictions <- predict(model_train, newdata = test_data, 
+                           interval = "prediction", level = 0.95)
+
+# Combine actual and predicted values
+prediction_results <- data.frame(
+  Actual = test_data$SalePrice,
+  Predicted = test_predictions[, "fit"],
+  Lower_PI = test_predictions[, "lwr"],
+  Upper_PI = test_predictions[, "upr"]
+)
+
+# Show first 10 predictions
+head(prediction_results, 10) %>%
+  kable(digits = 0,
+        caption = "First 10 Predictions with 95% Prediction Intervals") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Prediction Performance Metrics
+
+```{r prediction-metrics}
+# Calculate prediction errors
+prediction_results <- prediction_results %>%
+  mutate(
+    Error = Actual - Predicted,
+    Abs_Error = abs(Error),
+    Pct_Error = (Error / Actual) * 100,
+    Abs_Pct_Error = abs(Pct_Error)
+  )
+
+# Calculate performance metrics
+rmse <- sqrt(mean(prediction_results$Error^2))
+mae <- mean(prediction_results$Abs_Error)
+mape <- mean(prediction_results$Abs_Pct_Error)
+
+metrics <- data.frame(
+  Metric = c("Root Mean Squared Error (RMSE)", 
+             "Mean Absolute Error (MAE)",
+             "Mean Absolute Percentage Error (MAPE)"),
+  Value = c(
+    paste0("$", format(round(rmse), big.mark = ",")),
+    paste0("$", format(round(mae), big.mark = ",")),
+    paste0(round(mape, 2), "%")
+  )
+)
+
+kable(metrics,
+      caption = "Prediction Performance Metrics") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### **Question 8.2**: What is the average prediction error (in dollars) for the test set?
+
+**Answer:** [Students should report MAE]
+
+### **Question 8.3**: Is a RMSE of $`r format(round(rmse), big.mark = ",")` good or bad? How would you evaluate this?
+
+**Answer:** [Students should evaluate relative to mean price and discuss context]
+
+## Visualizing Predictions
+
+```{r prediction-plots, fig.height=10}
+# Actual vs Predicted plot
+p1 <- ggplot(prediction_results, aes(x = Actual, y = Predicted)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", linewidth = 1) +
+  scale_x_continuous(labels = scales::dollar) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Actual vs Predicted Sale Prices",
+       x = "Actual Sale Price", y = "Predicted Sale Price") +
+  theme_minimal()
+
+# Residual plot
+p2 <- ggplot(prediction_results, aes(x = Predicted, y = Error)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+  scale_x_continuous(labels = scales::dollar) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Residual Plot (Test Set)",
+       x = "Predicted Sale Price", y = "Prediction Error") +
+  theme_minimal()
+
+# Distribution of errors
+p3 <- ggplot(prediction_results, aes(x = Error)) +
+  geom_histogram(bins = 30, fill = "lightcoral", color = "darkred", alpha = 0.7) +
+  geom_vline(xintercept = 0, color = "blue", linetype = "dashed", linewidth = 1) +
+  scale_x_continuous(labels = scales::dollar) +
+  labs(title = "Distribution of Prediction Errors",
+       x = "Prediction Error (Actual - Predicted)", y = "Count") +
+  theme_minimal()
+
+p1 / p2 / p3
+```
+
+---
+
+# Prediction Intervals and Uncertainty
+
+## Understanding Prediction Intervals
+
+A **95% prediction interval** provides a range within which we expect a new observation's value to fall with 95% probability.
+
+$$PI = \hat{y} \pm t_{\alpha/2, n-p-1} \cdot SE_{pred}$$
+
+where $SE_{pred}$ accounts for both:
+1. Uncertainty in estimating the regression line (confidence interval component)
+2. Natural variability in individual observations around the line
+
+```{r prediction-interval-example}
+# Example: Predict price for a specific house
+example_house <- data.frame(
+  Gr.Liv.Area = 1800,
+  Overall.Qual = 7,
+  Year.Built = 2005,
+  Garage.Cars = 2,
+  Full.Bath = 2,
+  Total.Bsmt.SF = 900,
+  Lot.Area = 9000,
+  Bedroom.AbvGr = 3
+)
+
+# Point prediction with prediction interval
+prediction_with_pi <- predict(model_train, newdata = example_house, 
+                              interval = "prediction", level = 0.95)
+
+# Also get confidence interval for the mean
+prediction_with_ci <- predict(model_train, newdata = example_house, 
+                              interval = "confidence", level = 0.95)
+
+cat("Point Prediction: $", format(round(prediction_with_pi[1]), big.mark = ","), "\n\n")
+
+cat("95% Prediction Interval (for a new house):\n")
+cat("  Lower: $", format(round(prediction_with_pi[2]), big.mark = ","), "\n")
+cat("  Upper: $", format(round(prediction_with_pi[3]), big.mark = ","), "\n")
+cat("  Width: $", format(round(prediction_with_pi[3] - prediction_with_pi[2]), big.mark = ","), "\n\n")
+
+cat("95% Confidence Interval (for the mean price):\n")
+cat("  Lower: $", format(round(prediction_with_ci[2]), big.mark = ","), "\n")
+cat("  Upper: $", format(round(prediction_with_ci[3]), big.mark = ","), "\n")
+cat("  Width: $", format(round(prediction_with_ci[3] - prediction_with_ci[2]), big.mark = ","), "\n")
+```
+
+### **Question 9.1**: What is the difference between a prediction interval and a confidence interval? Which one is wider and why?
+
+**Answer:** [Students should explain that PI accounts for individual variability while CI is for the mean, PI is wider]
+
+## Coverage Rate Analysis
+
+Let's check what percentage of actual prices fall within our 95% prediction intervals:
+
+```{r coverage-analysis}
+# Check coverage
+prediction_results <- prediction_results %>%
+  mutate(
+    Within_PI = (Actual >= Lower_PI) & (Actual <= Upper_PI)
+  )
+
+coverage_rate <- mean(prediction_results$Within_PI)
+
+cat("Coverage Rate:", round(coverage_rate * 100, 2), "%\n")
+cat("Expected Coverage: 95%\n\n")
+
+coverage_summary <- prediction_results %>%
+  summarise(
+    Total_Predictions = n(),
+    Within_Interval = sum(Within_PI),
+    Outside_Interval = sum(!Within_PI),
+    Coverage_Rate = round(mean(Within_PI) * 100, 2)
+  )
+
+kable(coverage_summary,
+      caption = "Prediction Interval Coverage Analysis") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### **Question 9.2**: Is our empirical coverage rate close to the theoretical 95%? What might explain any differences?
+
+**Answer:** [Students should compare actual vs theoretical coverage and discuss model assumptions]
+
+## Visualizing Prediction Intervals
+
+```{r prediction-interval-plot, fig.height=8}
+# Sort by predicted value for better visualization
+prediction_plot_data <- prediction_results %>%
+  arrange(Predicted) %>%
+  mutate(Index = row_number())
+
+# Sample 100 observations for clearer visualization
+set.seed(123)
+sample_indices <- sample(1:nrow(prediction_plot_data), 
+                        min(100, nrow(prediction_plot_data)))
+plot_sample <- prediction_plot_data[sample_indices, ] %>%
+  arrange(Predicted) %>%
+  mutate(Index = row_number())
+
+ggplot(plot_sample, aes(x = Index)) +
+  geom_ribbon(aes(ymin = Lower_PI, ymax = Upper_PI), 
+              fill = "lightblue", alpha = 0.4) +
+  geom_point(aes(y = Actual), color = "darkgreen", size = 2, alpha = 0.7) +
+  geom_point(aes(y = Predicted), color = "red", size = 2, shape = 4) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(title = "Actual Prices vs Predictions with 95% Prediction Intervals",
+       subtitle = "Green dots = Actual | Red X = Predicted | Blue band = 95% PI",
+       x = "Observation (sorted by predicted price)",
+       y = "Sale Price") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### **Question 9.3**: Looking at the visualization, are most actual prices captured within the prediction intervals?
+
+**Answer:** [Students should visually assess the coverage]
+
+---
+
+# Summary and Conclusions
+
+## Key Findings
+
+```{r final-summary}
+# Create a comprehensive summary
+final_summary <- data.frame(
+  Metric = c(
+    "Number of Observations",
+    "Number of Predictors",
+    "R-squared",
+    "Adjusted R-squared",
+    "F-statistic",
+    "F-test p-value",
+    "Test RMSE",
+    "Test MAE",
+    "Most Important Predictor"
+  ),
+  Value = c(
+    nrow(housing_clean),
+    length(coef(model1)) - 1,
+    round(summary(model1)$r.squared, 4),
+    round(summary(model1)$adj.r.squared, 4),
+    round(summary(model1)$fstatistic[1], 2),
+    ifelse(glance(model1)$p.value < 0.001, "< 0.001", 
+           round(glance(model1)$p.value, 4)),
+    paste0("$", format(round(rmse), big.mark = ",")),
+    paste0("$", format(round(mae), big.mark = ",")),
+    "[Students: Identify based on standardized coefficients]"
+  )
+)
+
+kable(final_summary,
+      caption = "Final Model Summary") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## What We Learned
+
+Through this assignment, we have:
+
+1. **Prepared and explored data**: Handled missing values, examined distributions, and identified relationships
+2. **Built a regression model**: Specified and estimated a multiple linear regression model
+3. **Interpreted coefficients**: Understood how each predictor affects house prices
+4. **Assessed significance**: Used confidence intervals and p-values to determine which factors are statistically significant
+5. **Evaluated model quality**: Examined R², Adjusted R², and F-statistic
+6. **Made predictions**: Split data into training/test sets and evaluated prediction accuracy
+7. **Quantified uncertainty**: Calculated prediction intervals to express uncertainty in predictions
+
+## Connection to Course Material
+
+This assignment directly applies concepts from the course material on **inferential statistics and BLUE properties**:
+
+- **Unbiasedness**: OLS estimates are unbiased estimators of population parameters
+- **Best Linear Unbiased Estimator (BLUE)**: The regression coefficients minimize variance among all linear unbiased estimators
+- **Confidence Intervals**: We used sampling distribution theory to construct intervals for coefficients
+- **Hypothesis Testing**: T-tests and F-tests assess statistical significance
+- **Prediction Intervals**: Combine parameter uncertainty and natural variability
+
+### **Final Reflection Question**: How do the BLUE properties ensure that our regression estimates are reliable? Why is this important for making predictions?
+
+**Answer:** [Students should connect theoretical concepts to practical application]
+
+---
+
+# Assignment Submission Checklist
+
+Before submitting, ensure you have:
+
+- [ ] Answered all questions throughout the document
+- [ ] Interpreted all key coefficients and statistical tests
+- [ ] Identified which factors affect price most
+- [ ] Calculated and interpreted prediction metrics
+- [ ] Understood the difference between confidence and prediction intervals
+- [ ] Connected the practical analysis back to theoretical concepts (BLUE, inference, etc.)
+- [ ] Included all code output and visualizations
+- [ ] Written clear explanations in complete sentences
+
+---
+
+## Additional Resources
+
+For further learning:
+
+- Review the course material on **inferential_statistics_BLUE.qmd**
+- Reference: *Introduction to Linear Regression Analysis* by Montgomery, Peck, and Vining
+- Dataset documentation: [Ames Housing Dataset](https://www.tandfonline.com/doi/abs/10.1080/10691898.2011.11889627)
+
+---
+
+**Good luck with your analysis!**

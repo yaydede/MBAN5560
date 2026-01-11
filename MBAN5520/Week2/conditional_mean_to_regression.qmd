@@ -1,0 +1,779 @@
+---
+title: "From Conditional Mean to Regression"
+author: "Statistics for Business"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 8
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(readxl)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+```
+
+
+In this lesson, we will explore the fundamental connection between **conditional expectation** and **regression analysis**. We'll demonstrate how the regression function $E(Y|X) = f(X)$ naturally emerges from the concept of conditional probability and conditional expectation.
+
+
+1. **Joint, Marginal, and Conditional Probabilities**
+2. **Conditional Expectation**: $E(Y|X=x) = \sum_y y \cdot P(Y=y|X=x)$
+3. **Regression Decomposition**: $Y = E(Y|X) + \varepsilon$
+4. **The regression function as the best predictor**
+
+# Loading and Exploring the Data
+
+Let's start by loading our wage-education dataset and creating an initial visualization.
+
+```{r load-data}
+# Load the wage-education data
+wage_data <- read_excel("wageedu.xlsx", sheet = "Sheet1")
+colnames(wage_data) <- c("Wage", "Education")
+
+# Display first few rows
+head(wage_data, 10)
+
+# Summary statistics
+summary(wage_data)
+
+#Total observations
+nrow(wage_data)
+#Unique wage levels,
+unique(wage_data$Wage)
+#Unique education levels
+unique(wage_data$Education)
+```
+
+# Visualization: Wage vs Education
+
+```{r plot-scatter}
+# Create scatter plot with jittering for better visibility
+ggplot(wage_data, aes(x = Education, y = Wage)) +
+  geom_point(alpha = 0.5, size = 3, color = "steelblue", 
+             position = position_jitter(width = 0.2, height = 0)) +
+  labs(title = "Wage vs Years of Education",
+       x = "Years of Education",
+       y = "Wage ($)",
+       subtitle = "Each point represents an individual observation") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"))
+```
+
+We've visualized the data using a scatter plot. Now let's represent the data in a tabular format to understand the joint distribution of wages and education levels.
+
+```{r contingency-table}
+# Create contingency table
+cont_table <- table(wage_data$Education, wage_data$Wage)
+colnames(cont_table) <- paste("Wage", colnames(cont_table))
+rownames(cont_table) <- paste("Educ", rownames(cont_table))
+
+# Display the contingency table with column and row sums
+cont_table_df <- as.data.frame.matrix(cont_table)
+cont_table_df <- cont_table_df %>%
+  mutate(Total = rowSums(.)) %>%
+  rbind(Total = colSums(.))
+kable(cont_table_df, 
+      caption = "Contingency Table: Counts of (Education, Wage)",
+      col.names = c("Wage 308", "Wage 326.5", "Wage 731", "Wage 1123", "Total")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+# Probability Calculations
+
+Now, let's compute the joint, marginal, and conditional probabilities from our contingency table.  The idea here is to understand how the distribution of wages changes with different education levels.  One way to think about this is to consider the conditional probability of wage given education. We will also look at statistical independence between the two variables.
+
+## Joint Probabilities
+
+The **joint probability** $P(X=x, Y=y)$ represents the probability that education equals $x$ AND wage equals $y$:
+
+$$P(X=x, Y=y) = \frac{n(x,y)}{n_{total}}$$
+
+where $n(x,y)$ is the number of observations with education $x$ and wage $y$.
+
+```{r joint-prob}
+# Calculate joint probabilities
+n_total <- nrow(wage_data)
+joint_prob <- cont_table / n_total
+
+# Display joint probability table
+joint_prob_df <- as.data.frame.matrix(joint_prob)
+joint_prob_df <- round(joint_prob_df, 4)
+
+kable(joint_prob_df, 
+      caption = "Joint Probabilities: P(Education, Wage)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Marginal Probabilities
+
+The **marginal probability** is the probability of a single variable regardless of the other variable:
+
+- $P(X=x) = \sum_y P(X=x, Y=y)$ (marginal probability of education)
+- $P(Y=y) = \sum_x P(X=x, Y=y)$ (marginal probability of wage)
+
+```{r marginal-prob}
+# Calculate marginal probabilities
+marginal_educ <- rowSums(joint_prob)  # P(X=x)
+marginal_wage <- colSums(joint_prob)  # P(Y=y)
+
+# Display marginal probabilities for Education
+marginal_educ_df <- data.frame(
+  Education = c(6, 8, 12, 16),
+  `P(Education)` = round(marginal_educ, 4)
+)
+
+kable(marginal_educ_df, 
+      caption = "Marginal Probabilities: P(Education = x)",
+      col.names = c("Education (years)", "P(Education)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Display marginal probabilities for Wage
+marginal_wage_df <- data.frame(
+  Wage = c(308, 326.5, 731, 1123),
+  `P(Wage)` = round(marginal_wage, 4)
+)
+
+kable(marginal_wage_df, 
+      caption = "Marginal Probabilities: P(Wage = y)",
+      col.names = c("Wage ($)", "P(Wage)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Conditional Probabilities
+
+The **conditional probability** $P(Y=y|X=x)$ represents the probability that wage equals $y$ given that education equals $x$:
+
+$$P(Y=y|X=x) = \frac{P(X=x, Y=y)}{P(X=x)}$$
+
+This tells us the distribution of wages for each education level.
+
+```{r conditional-prob}
+# Calculate conditional probabilities P(Wage|Education)
+cond_prob <- joint_prob / marginal_educ
+
+# Display conditional probability table
+cond_prob_df <- as.data.frame.matrix(cond_prob)
+cond_prob_df <- round(cond_prob_df, 4)
+
+kable(cond_prob_df, 
+      caption = "Conditional Probabilities: P(Wage | Education)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Verify each row sums to 1
+row_sums <- round(rowSums(cond_prob), 4)
+cat("\nRow sums (should all be 1):", paste(row_sums, collapse = ", "))
+```
+
+let's visualize the conditional distribution of wage given education levels using faceted bar plots.
+
+```{r viz-conditional, echo=FALSE}
+# Reshape data for plotting
+# Create a data frame with all combinations
+wages_vals <- c(308, 326.5, 731, 1123)
+education_vals <- c(6, 8, 12, 16)
+
+# Create long format data directly
+cond_prob_long <- data.frame()
+for (i in 1:length(education_vals)) {
+  for (j in 1:length(wages_vals)) {
+    cond_prob_long <- rbind(cond_prob_long,
+                            data.frame(Education = education_vals[i],
+                                      Wage = wages_vals[j],
+                                      Probability = cond_prob[i, j]))
+  }
+}
+
+# Create faceted bar plot
+ggplot(cond_prob_long, aes(x = factor(Wage), y = Probability, fill = factor(Wage))) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ paste("Education =", Education, "years"), ncol = 2) +
+  labs(title = "Conditional Distribution of Wage given Education",
+       subtitle = "P(Wage | Education)",
+       x = "Wage ($)",
+       y = "Probability",
+       fill = "Wage") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_brewer(palette = "Set2")
+
+```
+
+Conditional probabilities provide insights into how wage distributions vary with education levels. For example, as education increases, the probability of higher wages tends to increase, indicating a positive relationship between education and wage.
+
+Moreover, we can check for statistical independence between education and wage. If they were independent, we would have:
+
+$$P(Y=y|X=x) = P(Y=y)$$
+We can alos express this as:
+
+$$P(X=x, Y=y) = P(X=x) \cdot P(Y=y)$$
+Hence, if education and wage are independent, the conditional probabilities should equal the marginal probabilities of wage for all education levels.
+
+Let's compare the conditional probabilities with the marginal probabilities of wage to assess independence.
+
+```{r independence-check}
+# Compare conditional probabilities with marginal probabilities
+independence_check <- data.frame(
+  Wage = wages_vals,
+  `P(Wage)` = round(marginal_wage, 4)
+)
+
+# Let's add conditional probabilities for each education level
+for (i in 1:length(education_vals)) {
+  independence_check <- cbind(independence_check,
+                              round(cond_prob[i, ], 4))
+  colnames(independence_check)[ncol(independence_check)] <- paste("P(Wage | Educ =", education_vals[i], ")")
+}
+
+independence_check
+```
+
+The final concept related to conditional probabilities is Bayes' Theorem, which allows us to reverse conditional probabilities, which can be expressed as 
+
+$$P(X=x|Y=y) = \frac{P(Y=y|X=x) \cdot P(X=x)}{P(Y=y)}$$
+
+## Conditional Expectation
+
+Before jumping into conditional expectation, let's summarize what we've done so far:
+  
+1. Calculated the **joint probabilities** $P(X,Y)$ from the data. 
+2. Derived the **marginal probabilities** $P(X)$ and $P(Y)$. 
+3. Computed the **conditional probabilities** $P(Y|X)$ to understand how wage distributions change with education levels.  
+
+What comes next is to compute the **conditional expectation** of wage given education, which forms the basis of regression analysis.
+
+But first, what's "expectation" in this context? Expectation (or expected value) is the weighted average of all possible outcomes, where each outcome is weighted by its probability.  Here is a quick refresher:
+
+- For a discrete random variable $Y$ with possible values $y_1, y_2, \ldots, y_k$ and corresponding probabilities $P(Y=y_i)$, the expectation is:$$E(Y) = \sum_{i=1}^{k} y_i \cdot P(Y=y_i)$$
+- Similarly, the **conditional expectation** $E(Y|X=x)$ is the expected value of $Y$ given that $X$ takes on a specific value $x$.
+
+In our context, the **conditional expectation** $E(Y|X=x)$ is the expected (mean) wage for a given education level:
+
+$$E(Y|X=x) = \sum_y y \cdot P(Y=y|X=x)$$
+
+This is the average wage we expect for someone with education level $x$.
+
+```{r conditional-expectation}
+# Calculate conditional expectations
+wages <- c(308, 326.5, 731, 1123)
+cond_exp <- numeric(4)
+education_levels <- c(6, 8, 12, 16)
+
+# Calculate E(Y|X) for each education level
+for (i in 1:4) {
+  cond_exp[i] <- sum(wages * cond_prob[i, ])
+}
+
+# Create summary table
+cond_exp_df <- data.frame(
+  Education = education_levels,
+  Conditional_Mean = round(cond_exp, 2)
+)
+
+kable(cond_exp_df, 
+      caption = "Conditional Expectation: E(Wage | Education)",
+      col.names = c("Education (years)", "E(Wage given Education)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Show detailed calculation for Education = 12
+educ_12_idx <- which(education_levels == 12)
+cat("E(Wage | Educ=12) = ")
+for (j in 1:length(wages)) {
+  if (j > 1) cat(" + ")
+  cat(sprintf("%.0f × %.4f", wages[j], cond_prob[educ_12_idx, j]))
+}
+cat(sprintf("\n                  = %.2f\n", cond_exp[educ_12_idx]))
+```
+
+# From Conditional Mean to Regression
+
+The conditional expectation $E(Y|X)$ defines the **regression function**. We can write:
+
+$$Y = E(Y|X) + \varepsilon$$
+
+where:
+  
+- $E(Y|X) = f(X)$ is the systematic component (regression function) 
+- $\varepsilon$ is the random error with $E(\varepsilon|X) = 0$. 
+
+The error term $\varepsilon$ captures the deviation of actual wages from the expected wage given education.
+
+But, first expressed the conditional mean as the function of education:
+
+$$E(Wage | Education) = f(Education) = \beta_1 + \beta_2 \cdot Education$$
+
+where $\beta_1$ is the intercept and $\beta_2$ is the slope of the regression line.
+
+Here is the visualization of the regression function:
+
+```{r viz-regression-function, echo=FALSE}
+# Create data frame for regression function
+regression_df <- data.frame(
+  Education = education_levels,
+  Conditional_Mean = cond_exp
+)
+# Plot regression function
+ggplot() +
+  # Original data points
+  geom_point(data = wage_data, 
+             aes(x = Education, y = Wage),
+             alpha = 0.3, size = 2, color = "gray") +
+  # Regression function line
+  geom_line(data = regression_df,
+            aes(x = Education, y = Conditional_Mean),
+            color = "blue", size = 1.5) +
+  geom_point(data = regression_df,
+             aes(x = Education, y = Conditional_Mean),
+             color = "blue", size = 4) +
+  labs(title = "Regression Function: E(Wage | Education)",
+       subtitle = "The conditional mean represents the regression function",
+       x = "Years of Education",
+       y = "Wage ($)") +
+  theme_minimal()
+```
+Here we show several error terms for individual observations on the same plot
+
+```{r viz-errors, echo=FALSE}
+# Sample some observations to illustrate errors
+set.seed(123)
+sampled_data <- wage_data %>% sample_n(20)
+# Plot with errors
+ggplot() +
+  # Original data points
+  geom_point(data = wage_data, 
+             aes(x = Education, y = Wage),
+             alpha = 0.2, size = 2, color = "gray") +
+  # Regression function line
+  geom_line(data = regression_df,
+            aes(x = Education, y = Conditional_Mean),
+            color = "blue", size = 1.5) +
+  geom_point(data = regression_df,
+             aes(x = Education, y = Conditional_Mean),
+             color = "blue", size = 4) +
+  # Error lines
+  geom_segment(data = sampled_data,
+               aes(x = Education, xend = Education,
+                   y = Wage, yend = cond_exp[match(Education, education_levels)]),
+               color = "red", linetype = "dashed") +
+  labs(title = "Regression Decomposition: Y = E(Y|X) + ε",
+       subtitle = "Red dashed lines represent the error terms (ε)",
+       x = "Years of Education",
+       y = "Wage ($)") +
+  theme_minimal()
+```
+We can also see the regression decomposition in a tabular format:
+
+```{r regression-decomposition}
+# Add conditional expectations to the original data
+wage_data$Cond_Exp <- NA
+for (i in 1:nrow(wage_data)) {
+  educ_idx <- which(education_levels == wage_data$Education[i])
+  wage_data$Cond_Exp[i] <- cond_exp[educ_idx]
+}
+
+# Calculate residuals
+wage_data$Residual <- wage_data$Wage - wage_data$Cond_Exp
+
+# Display first 10 observations with decomposition
+decomp_display <- wage_data[1:10, ] %>%
+  mutate(across(c(Cond_Exp, Residual), ~round(., 2)))
+
+kable(decomp_display, 
+      caption = "Regression Decomposition: Y = E(Y|X) + ε",
+      col.names = c("Wage (Y)", "Education (X)", "E(Y given X)", "ε")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## Verifying Key Properties
+
+Let's first discuss why E(ε|X) = 0.  If we take the conditional expectation of both sides of the regression decomposition:
+
+$$ Y = \beta_1 + \beta_2.X+ \varepsilon $$
+Hence
+
+$$ E(Y|X) = E(\beta_1 + \beta_2.X + \varepsilon | X) $$
+Using the linearity of expectation and the fact that $\beta_1$ and $\beta_2.X$ are functions of $X$:
+
+$$ E(Y|X) = \beta_1 + \beta_2.X + E(\varepsilon | X) $$
+
+
+Let's verify that $E(\varepsilon|X) = 0$, which is a fundamental property of regression:
+
+```{r verify-properties}
+# Calculate E(epsilon|X) for each education level
+residual_means <- wage_data %>%
+  group_by(Education) %>%
+  summarise(
+    `Mean_Residual` = mean(Residual),
+    `SD_Residual` = sd(Residual),
+    `n` = n()
+  ) %>%
+  mutate(across(c(Mean_Residual, SD_Residual), ~round(., 6)))
+
+kable(residual_means, 
+      caption = "Mean and Standard Deviation of Residuals by Education Level",
+      col.names = c("Education", "E(ε given X)", "SD(ε given X)", "n")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+cat("\n✓ Notice that E(ε|X) ≈ 0 for all education levels (within numerical precision)")
+```
+
+## Linear Regression Comparison
+
+Now let's fit a linear regression and compare it with our conditional expectations:
+
+```{r linear-regression}
+# Fit linear regression
+lm_model <- lm(Wage ~ Education, data = wage_data)
+
+# Display regression summary
+summary(lm_model)
+
+# Get predictions from linear model
+education_grid <- data.frame(Education = education_levels)
+lm_predictions <- predict(lm_model, newdata = education_grid)
+
+# Create comparison table
+comparison_df <- data.frame(
+  Education = education_levels,
+  `Conditional_Mean` = round(cond_exp, 2),
+  `Linear_Regression` = round(lm_predictions, 2),
+  `Difference` = round(cond_exp - lm_predictions, 2)
+)
+
+kable(comparison_df, 
+      caption = "Comparison: Conditional Mean vs Linear Regression",
+      col.names = c("Education", "E(Y given X)", "Linear Fit", "Difference")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+Why do we see differences between the conditional mean and the linear regression predictions?  The conditional mean $E(Y|X)$ captures the true average wage for each education level, while linear regression provides the best linear approximation to this relationship.  If the true relationship is not perfectly linear, discrepancies will arise.
+
+
+# Key Insights and Theoretical Foundation
+
+The conditional expectation $E(Y|X)$ is the **best predictor** of $Y$ given $X$ in the sense that it minimizes the mean squared error:
+
+$$E[(Y - g(X))^2]$$ 
+
+over all possible functions $g(X)$.
+
+More intuitively, if we want to predict wages based on education, using the conditional mean $E(Y|X)$ will yield the lowest average squared prediction error compared to any other function of $X$.
+
+The regression function $f(X) = E(Y|X)$ has these important properties:
+
+1. **Unbiasedness**: $E[Y - f(X)] = 0$. This means that $E(b_2)=\beta_2$ and $E(b_1)=\beta_1$
+2. **Orthogonality**: $E[\varepsilon \cdot X] = 0$ This implies that the error term is uncorrelated with any of $X$.  If this condition holds, then $Cov(e,X)=0$.  If does not hold, then we have endogeneity and our OLS estimates will be biased and inconsistent.
+3. **Minimum MSE**: $f(X)$ minimizes $E[(Y - g(X))^2]$ over all functions $g$
+
+The linear regression model is a specific case where we assume a linear form for $f(X)$: 
+
+$$f(X) = \beta_1 + \beta_2 X$$
+Linear regression assumes that $E(Y|X) = \beta_0 + \beta_1 X$, which is a **linear approximation** to the true conditional expectation. 
+
+In our example:
+  
+- The true $E(Y|X)$ is not perfectly linear 
+- Linear regression provides the best linear approximation 
+- The difference represents the **specification error** from assuming linearity. 
+
+```{r nonlinearity-test}
+# Test for nonlinearity
+education_factor <- factor(wage_data$Education)
+anova_model <- lm(Wage ~ education_factor, data = wage_data)
+linear_model <- lm(Wage ~ Education, data = wage_data)
+
+# F-test for linearity
+anova_result <- anova(linear_model, anova_model)
+print(anova_result)
+
+f_stat <- anova_result$F[2]
+p_value <- anova_result$`Pr(>F)`[2]
+
+cat("\n")
+if (p_value < 0.05) {
+  cat("✓ The F-test suggests significant nonlinearity (p < 0.05)\n")
+  cat("  This confirms that E(Y|X) is not perfectly linear in X")
+} else {
+  cat("The F-test does not detect significant nonlinearity")
+}
+```
+
+# Mathematical Derivation: From Covariance to Regression Coefficients
+
+Let's derive the regression coefficients using the covariance approach, which provides another perspective on the regression function.
+
+Starting with the linear regression model:
+$$Y_i = \beta_1 + \beta_2 X_i + e_i$$
+
+Taking the covariance of both sides with X:
+$$Cov(Y, X) = Cov(\beta_1 + \beta_2 X + e, X)$$
+
+Expanding using covariance properties:
+$$Cov(Y, X) = Cov(\beta_1, X) + Cov(\beta_2 X, X) + Cov(e, X)$$
+
+Since $\beta_1$ is a constant: $Cov(\beta_1, X) = 0$
+Since $\beta_2$ is a constant: $Cov(\beta_2 X, X) = \beta_2 Cov(X, X) = \beta_2 Var(X)$
+By assumption: $Cov(e, X) = 0$
+
+Therefore:
+$$Cov(Y, X) = \beta_2 Var(X)$$
+
+Solving for $\beta_2$:
+$$\beta_2 = \frac{Cov(Y, X)}{Var(X)} = \frac{\sigma_{XY}}{\sigma_X^2}$$
+
+Let's calculate $\beta_2$ using our wage-education data:
+
+```{r calculate-beta2}
+# Calculate covariance and variance
+cov_xy <- cov(wage_data$Wage, wage_data$Education)
+var_x <- var(wage_data$Education)
+
+# Calculate beta_2
+beta_2 <- cov_xy / var_x
+
+cat("Cov(Wage, Education) =", round(cov_xy, 2), "\n")
+cat("Var(Education) =", round(var_x, 2), "\n")
+cat("β₂ = Cov(Y,X)/Var(X) =", round(cov_xy, 2), "/", round(var_x, 2), "=", round(beta_2, 2), "\n")
+```
+
+Using the fact that the regression line passes through the mean point $(\bar{X}, \bar{Y})$:
+$$\bar{Y} = \beta_1 + \beta_2 \bar{X}$$
+
+Therefore:
+$$\beta_1 = \bar{Y} - \beta_2 \bar{X} = E(Y) - \beta_2 E(X)$$
+
+```{r calculate-beta1}
+# Calculate means
+mean_y <- mean(wage_data$Wage)
+mean_x <- mean(wage_data$Education)
+
+# Calculate beta_1
+beta_1 <- mean_y - beta_2 * mean_x
+
+cat("E(Wage) =", round(mean_y, 2), "\n")
+cat("E(Education) =", round(mean_x, 2), "\n")
+cat("β₁ = E(Y) - β₂E(X) =", round(mean_y, 2), "-", round(beta_2, 2), "×", round(mean_x, 2), "=", round(beta_1, 2), "\n")
+```
+
+And the final regression equation is:
+
+```{r final-equation}
+# Display the final equation
+cat("\n### The Regression Function:\n")
+cat("E(Y|X) =", round(beta_1, 2), "+", round(beta_2, 2), "× X\n")
+cat("\nOr in our context:\n")
+cat("E(Wage | Education) =", round(beta_1, 2), "+", round(beta_2, 2), "× Education\n")
+
+# Verify this matches our lm() results
+cat("\n### Verification with lm():\n")
+coef(lm_model)
+```
+We've now shown two equivalent approaches to regression:
+
+1. **Probabilistic Approach**: Starting from conditional probabilities → conditional expectation → E(Y|X)
+2. **Covariance Approach**: Using the orthogonality condition Cov(e,X) = 0 → deriving β coefficients
+
+Both lead to the same regression function, demonstrating that:
+  
+- Regression coefficients have a deep connection to conditional expectations 
+- The slope β₂ represents the covariance between X and Y, scaled by the variance of X 
+- The assumption E(e|X) = 0 is equivalent to Cov(e,X) = 0 under certain conditions 
+
+# OLS Analytical Solution: Minimizing Residual Sum of Squares
+
+In this section, we derive the regression coefficients using the **Ordinary Least Squares (OLS)** method by minimizing the Residual Sum of Squares (RSS). This provides a third perspective on regression, complementing the probabilistic and covariance approaches.
+
+For the linear regression model:
+$$y_i = \beta_1 + \beta_2 x_i + e_i$$
+
+We want to find $\beta_1$ and $\beta_2$ that minimize the **Residual Sum of Squares**:
+
+$$RSS = \sum_{i=1}^{n} e_i^2 = \sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i)^2$$
+
+This is an optimization problem: find $(\beta_1, \beta_2)$ such that RSS is minimized.
+
+To minimize RSS, we take partial derivatives with respect to $\beta_1$ and $\beta_2$ and set them equal to zero:
+
+$$\frac{\partial RSS}{\partial \beta_1} = \frac{\partial}{\partial \beta_1} \sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i)^2$$
+
+Using the chain rule:
+$$\frac{\partial RSS}{\partial \beta_1} = 2 \sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i)(-1) = -2 \sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i)$$
+
+Setting equal to zero:
+$$\sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i) = 0$$
+
+$$\frac{\partial RSS}{\partial \beta_2} = \frac{\partial}{\partial \beta_2} \sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i)^2$$
+
+Using the chain rule:
+$$\frac{\partial RSS}{\partial \beta_2} = 2 \sum_{i=1}^{n} (y_i - \beta_1 - \beta_2 x_i)(-x_i) = -2 \sum_{i=1}^{n} x_i(y_i - \beta_1 - \beta_2 x_i)$$
+
+Setting equal to zero:
+$$\sum_{i=1}^{n} x_i(y_i - \beta_1 - \beta_2 x_i) = 0$$
+
+Now we have two equations from the first order conditions: the **Normal Equations**
+
+1. $\sum_{i=1}^{n} y_i = n\beta_1 + \beta_2 \sum_{i=1}^{n} x_i$
+
+2. $\sum_{i=1}^{n} x_i y_i = \beta_1 \sum_{i=1}^{n} x_i + \beta_2 \sum_{i=1}^{n} x_i^2$
+
+
+From equation (1), dividing by $n$:
+$$\bar{y} = \beta_1 + \beta_2 \bar{x}$$
+
+Therefore:
+$$\beta_1 = \bar{y} - \beta_2 \bar{x}$$
+
+Substituting $\beta_1 = \bar{y} - \beta_2 \bar{x}$ into equation (2):
+$$\sum_{i=1}^{n} x_i y_i = (\bar{y} - \beta_2 \bar{x}) \sum_{i=1}^{n} x_i + \beta_2 \sum_{i=1}^{n} x_i^2$$
+
+Since $\sum_{i=1}^{n} x_i = n\bar{x}$:
+$$\sum_{i=1}^{n} x_i y_i = n\bar{x}\bar{y} - \beta_2 n\bar{x}^2 + \beta_2 \sum_{i=1}^{n} x_i^2$$
+
+Rearranging:
+$$\sum_{i=1}^{n} x_i y_i - n\bar{x}\bar{y} = \beta_2 \left(\sum_{i=1}^{n} x_i^2 - n\bar{x}^2\right)$$
+
+Therefore:
+$$\beta_2 = \frac{\sum_{i=1}^{n} x_i y_i - n\bar{x}\bar{y}}{\sum_{i=1}^{n} x_i^2 - n\bar{x}^2}$$
+
+## Connecting to the Covariance Formula
+
+Now we show that this OLS formula is equivalent to $\beta_2 = \frac{Cov(X,Y)}{Var(X)}$.
+
+#### Numerator:
+$$\sum_{i=1}^{n} x_i y_i - n\bar{x}\bar{y} = \sum_{i=1}^{n} (x_i - \bar{x})(y_i - \bar{y})$$
+
+**Proof**: Expanding the right side:
+$$\sum_{i=1}^{n} (x_i - \bar{x})(y_i - \bar{y}) = \sum_{i=1}^{n} x_i y_i - \bar{y}\sum_{i=1}^{n} x_i - \bar{x}\sum_{i=1}^{n} y_i + n\bar{x}\bar{y}$$
+$$= \sum_{i=1}^{n} x_i y_i - \bar{y}(n\bar{x}) - \bar{x}(n\bar{y}) + n\bar{x}\bar{y}$$
+$$= \sum_{i=1}^{n} x_i y_i - n\bar{x}\bar{y}$$
+
+This is the sample covariance multiplied by $(n-1)$: $(n-1) \cdot Cov(X,Y)$
+
+And the denominator:
+
+$$\sum_{i=1}^{n} x_i^2 - n\bar{x}^2 = \sum_{i=1}^{n} (x_i - \bar{x})^2$$
+
+**Proof**: Expanding the right side:
+$$\sum_{i=1}^{n} (x_i - \bar{x})^2 = \sum_{i=1}^{n} x_i^2 - 2\bar{x}\sum_{i=1}^{n} x_i + n\bar{x}^2$$
+$$= \sum_{i=1}^{n} x_i^2 - 2\bar{x}(n\bar{x}) + n\bar{x}^2$$
+$$= \sum_{i=1}^{n} x_i^2 - n\bar{x}^2$$
+
+This is the sample variance multiplied by $(n-1)$: $(n-1) \cdot Var(X)$
+
+$$\beta_2 = \frac{(n-1) \cdot Cov(X,Y)}{(n-1) \cdot Var(X)} = \frac{Cov(X,Y)}{Var(X)}$$
+
+## Numerical Verification with Our Data
+
+Let's verify that the OLS formula using summations gives the same result as the covariance approach:
+
+```{r ols-verification}
+# Calculate using summation formulas
+n <- nrow(wage_data)
+sum_x <- sum(wage_data$Education)
+sum_y <- sum(wage_data$Wage)
+sum_xy <- sum(wage_data$Education * wage_data$Wage)
+sum_x2 <- sum(wage_data$Education^2)
+
+x_bar <- mean(wage_data$Education)
+y_bar <- mean(wage_data$Wage)
+
+# Calculate beta_2 using the OLS summation formula
+beta_2_ols <- (sum_xy - n * x_bar * y_bar) / (sum_x2 - n * x_bar^2)
+
+# Calculate beta_1 using the OLS formula
+beta_1_ols <- y_bar - beta_2_ols * x_bar
+
+# Display the calculations
+cat("OLS Calculation using Summations:\n")
+cat("n =", n, "\n")
+cat("Σx =", sum_x, "\n")
+cat("Σy =", sum_y, "\n")
+cat("Σxy =", sum_xy, "\n")
+cat("Σx² =", sum_x2, "\n")
+cat("x̄ =", round(x_bar, 2), "\n")
+cat("ȳ =", round(y_bar, 2), "\n\n")
+
+cat("Numerator: Σxy - nx̄ȳ =", sum_xy, "-", n, "×", round(x_bar, 2), "×", round(y_bar, 2), 
+    "=", round(sum_xy - n * x_bar * y_bar, 2), "\n")
+cat("Denominator: Σx² - nx̄² =", sum_x2, "-", n, "×", round(x_bar^2, 2), 
+    "=", round(sum_x2 - n * x_bar^2, 2), "\n\n")
+
+cat("OLS Results:\n")
+cat("β₂ (OLS) =", round(beta_2_ols, 4), "\n")
+cat("β₁ (OLS) =", round(beta_1_ols, 4), "\n\n")
+
+# Compare with covariance approach from Section 7
+cat("Comparison with Covariance Approach (Section 7):\n")
+cat("β₂ (Covariance) =", round(beta_2, 4), "\n")
+cat("β₁ (Covariance) =", round(beta_1, 4), "\n\n")
+
+# Verify they are the same
+cat("✓ The OLS and Covariance approaches yield identical results!\n")
+```
+
+# Key Insight: Three Equivalent Paths to Regression
+
+We have now demonstrated **three equivalent approaches** to deriving the regression coefficients:
+
+1. **Probabilistic Approach** (Sections 1-5): 
+   - Start with conditional probabilities
+   - Calculate conditional expectations E(Y|X)
+   - The regression function emerges naturally
+
+2. **Covariance Approach** (Section 7):
+   - Use the orthogonality condition: Cov(e, X) = 0
+   - Derive β₂ = Cov(X,Y)/Var(X) directly
+
+3. **Optimization Approach** (Section 8):
+   - Minimize the Residual Sum of Squares
+   - Solve the normal equations using calculus
+   - Show algebraically that this yields β₂ = Cov(X,Y)/Var(X)
+
+All three approaches lead to the **same regression function**, demonstrating the deep mathematical unity underlying regression analysis. Whether we think of regression as:
+- Estimating conditional expectations
+- Finding coefficients with zero error-predictor covariance
+- Minimizing squared prediction errors
+
+We arrive at the same answer: **β₂ = Cov(X,Y)/Var(X)** and **β₁ = ȳ - β₂x̄**
+
+We have demonstrated the fundamental connection between **conditional probability** and **regression**:
+
+1. **Starting Point**: Joint distribution of $(X, Y)$
+   
+2. **Conditional Probability**: $P(Y|X) = \frac{P(X,Y)}{P(X)}$
+
+3. **Conditional Expectation**: $E(Y|X) = \sum_y y \cdot P(Y=y|X)$
+
+4. **Regression Function**: $E(Y|X) = f(X)$
+
+5. **Decomposition**: $Y = E(Y|X) + \varepsilon$ where $E(\varepsilon|X) = 0$
+
+**Key Takeaways:**
+  
+- **Regression IS conditional expectation**: The regression function $f(X)$ is precisely $E(Y|X)$ 
+- **Optimal prediction**: $E(Y|X)$ minimizes mean squared error 
+- **Linear regression**: Provides the best linear approximation when $E(Y|X)$ is not linear 
+- **Residuals**: Have zero conditional mean by construction. 
+  
+**Practical Implications:**
+  
+1. **Understanding regression**: It's not just "fitting a line" – it's estimating conditional expectations 
+2. **Model specification**: Deviations from linearity represent real features of $E(Y|X)$ 
+3. **Prediction**: The conditional mean is the theoretically optimal point predictor. 

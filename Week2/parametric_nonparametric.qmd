@@ -1,0 +1,1291 @@
+---
+title: "From Parametric to Nonparametric Models"
+author: "MBAN 5560 - Machine Learning"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(splines)
+```
+
+In this lecture, we explore the fundamental distinction between **parametric** and **nonparametric** models. Most machine learning algorithms are nonparametric, meaning they don't assume a specific functional form for the relationship between predictors and outcome. Understanding this distinction is crucial for building effective predictive models.
+
+**Learning Objectives:**
+
+1. Understand why parametric models may fail when the true relationship is complex
+2. Learn how to extend parametric models through polynomial regression
+3. Master nonparametric methods: LOESS and Splines
+4. Understand the role of hyperparameters in controlling model flexibility
+5. Recognize the bias-variance trade-off in model selection
+
+# Part 1: Review of Parametric Models
+
+## The Prediction Problem
+
+Recall from MBAN 5520 that we model the conditional expectation:
+
+$$E(Y|X) = f(X)$$
+
+In **parametric models**, we assume a specific functional form for $f(X)$. The simplest assumption is linearity:
+
+$$f(X) = \beta_0 + \beta_1 X$$
+
+This assumption has advantages:
+
+- **Interpretability**: $\beta_1$ represents the change in $Y$ for a one-unit change in $X$
+- **Computational simplicity**: OLS has a closed-form solution
+- **Statistical properties**: Under certain conditions, OLS is BLUE (Best Linear Unbiased Estimator)
+
+But what if the true relationship is **not linear**?
+
+## Simulated Data: A Nonlinear World
+
+Let's create a dataset where we **know** the true relationship is nonlinear:
+
+```{r simulate-data}
+set.seed(1)
+
+# True data generating process (DGP)
+x <- seq(from = 0, to = 20, by = 0.1)
+f_true <- 500 + 20*x - 90*sin(x)  # Nonlinear deterministic component
+
+n <- length(x)
+y <- f_true + rnorm(n, mean = 0, sd = 100)  # Add random noise
+
+df_train <- data.frame(y = y, x = x)
+```
+
+The true relationship includes a **sinusoidal component** that a simple linear model cannot capture. Let's visualize this:
+
+```{r plot-true-dgp, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1.2, linetype = "dashed") +
+  labs(
+    title = "Simulated Data with Nonlinear True Relationship",
+    subtitle = "Red dashed line shows the true f(X) = 500 + 20X - 90sin(X)",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## Linear Model: When Assumptions Fail
+
+Let's fit a simple linear regression:
+
+```{r fit-linear}
+model_linear <- lm(y ~ x, data = df_train)
+summary(model_linear)
+```
+
+```{r plot-linear, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = model_linear$fitted.values), color = "blue", size = 1.2) +
+  labs(
+    title = "Linear Model Fit",
+    subtitle = "Blue: Linear fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+The linear model captures the overall upward trend but completely misses the oscillating pattern. This is **model misspecification** - our assumed functional form doesn't match reality.
+
+## Polynomial Regression: Adding Flexibility
+
+One way to make parametric models more flexible is to include **polynomial terms**:
+
+$$f(X) = \beta_0 + \beta_1 X + \beta_2 X^2 + \beta_3 X^3 + ... + \beta_p X^p$$
+
+This is still a parametric model because we specify the functional form. However, higher-degree polynomials can approximate complex curves.
+
+### Degree 3 Polynomial
+
+```{r fit-poly3}
+model_poly3 <- lm(y ~ poly(x, 3), data = df_train)
+summary(model_poly3)
+```
+
+```{r plot-poly3, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = model_poly3$fitted.values), color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Polynomial Regression (Degree 3)",
+    subtitle = "Green: Polynomial fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+### Degree 10 Polynomial
+
+```{r fit-poly10}
+model_poly10 <- lm(y ~ poly(x, 10), data = df_train)
+```
+
+```{r plot-poly10, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = model_poly10$fitted.values), color = "purple", size = 1.2) +
+  labs(
+    title = "Polynomial Regression (Degree 10)",
+    subtitle = "Purple: Polynomial fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+### Degree 19 Polynomial
+
+```{r fit-poly19}
+model_poly19 <- lm(y ~ poly(x, 19), data = df_train)
+```
+
+```{r plot-poly19, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = model_poly19$fitted.values), color = "orange", size = 1.2) +
+  labs(
+    title = "Polynomial Regression (Degree 19)",
+    subtitle = "Orange: Polynomial fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## The Problem with High-Degree Polynomials
+
+As we increase polynomial degree:
+
+1. **Training fit improves** - the model can capture more complex patterns
+2. **Risk of overfitting increases** - the model may fit noise rather than signal
+3. **Extrapolation becomes dangerous** - polynomial behavior at edges can be erratic
+
+Let's compare training RMSE:
+
+```{r compare-rmse-train}
+calc_rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+train_rmse <- data.frame(
+  Model = c("Linear", "Poly(3)", "Poly(10)", "Poly(19)"),
+  RMSE = c(
+    calc_rmse(df_train$y, model_linear$fitted.values),
+    calc_rmse(df_train$y, model_poly3$fitted.values),
+    calc_rmse(df_train$y, model_poly10$fitted.values),
+    calc_rmse(df_train$y, model_poly19$fitted.values)
+  )
+)
+
+kable(train_rmse, 
+      caption = "Training RMSE by Model Complexity",
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+Training RMSE decreases with complexity - but does this mean better predictions?
+
+## Test Set Evaluation: The Truth Revealed
+
+To properly evaluate models, we need **new data** that the model hasn't seen:
+
+```{r create-test}
+set.seed(2)
+x_test <- seq(from = 0, to = 20, by = 0.1)
+f_true_test <- 500 + 20*x_test - 90*sin(x_test)
+y_test <- f_true_test + rnorm(length(x_test), mean = 0, sd = 100)
+
+df_test <- data.frame(y = y_test, x = x_test)
+```
+
+```{r eval-test}
+# Predictions on test data
+pred_linear <- predict(model_linear, newdata = df_test)
+pred_poly3 <- predict(model_poly3, newdata = df_test)
+pred_poly10 <- predict(model_poly10, newdata = df_test)
+pred_poly19 <- predict(model_poly19, newdata = df_test)
+
+test_rmse <- data.frame(
+  Model = c("Linear", "Poly(3)", "Poly(10)", "Poly(19)"),
+  Train_RMSE = c(
+    calc_rmse(df_train$y, model_linear$fitted.values),
+    calc_rmse(df_train$y, model_poly3$fitted.values),
+    calc_rmse(df_train$y, model_poly10$fitted.values),
+    calc_rmse(df_train$y, model_poly19$fitted.values)
+  ),
+  Test_RMSE = c(
+    calc_rmse(df_test$y, pred_linear),
+    calc_rmse(df_test$y, pred_poly3),
+    calc_rmse(df_test$y, pred_poly10),
+    calc_rmse(df_test$y, pred_poly19)
+  )
+)
+
+test_rmse$Overfit_Gap <- test_rmse$Test_RMSE - test_rmse$Train_RMSE
+
+kable(test_rmse, 
+      caption = "Training vs Test RMSE: Evidence of Overfitting",
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Key Observations:**
+
+- Training RMSE decreases monotonically with complexity
+- Test RMSE has a **U-shape** - it decreases then increases
+- The **gap** between test and training RMSE grows with complexity
+- This gap is the **overfitting penalty**
+
+The polynomial approach shows us that simply adding more flexibility doesn't always help. We need methods that adapt to data more intelligently.
+
+# Part 2: Introduction to Nonparametric Models
+
+## What Makes a Model Nonparametric?
+
+**Parametric models** assume a specific functional form with a fixed number of parameters:
+
+- Linear regression: $f(X) = \beta_0 + \beta_1 X$ (2 parameters)
+- Polynomial regression: $f(X) = \sum_{j=0}^{p} \beta_j X^j$ (p+1 parameters)
+- Logistic regression: $\log\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 X$
+
+**Nonparametric models** do NOT assume a specific functional form:
+
+- The number of "effective parameters" grows with sample size
+- The model **learns** the shape of $f(X)$ from the data
+- More flexible, but requires more data
+
+## Two Approaches to Nonparametric Modeling
+
+Nonparametric methods can be classified by what they hold **fixed**:
+
+| Approach | Fixed Component | Variable Component | Examples |
+|----------|-----------------|-------------------|----------|
+| **Fixed Bin Size** | Window/bandwidth | Number of observations per bin | LOESS, Splines |
+| **Fixed Sample Size** | Number of neighbors (k) | Window size varies | k-Nearest Neighbors |
+
+In this lecture, we focus on **fixed bin size** methods: LOESS and Splines. k-NN will be covered in a separate lecture.
+
+## The Core Idea: Local Fitting
+
+Instead of fitting one global model to all data, nonparametric methods:
+
+1. Focus on a **local neighborhood** around each prediction point
+2. Fit a simple model (constant, linear, or polynomial) to nearby points
+3. Use **weights** to give more importance to closer observations
+4. Move to the next point and repeat
+
+This allows the model to adapt to local patterns in the data.
+
+## Simple Bin Smoother: The Most Basic Approach
+
+Before introducing sophisticated methods, let's start with the simplest possible nonparametric smoother: the **bin smoother** (also called "regressogram").
+
+**Algorithm:**
+
+1. Divide the x-axis into equal-width bins
+2. For each bin, calculate the mean of all y values
+3. Use this mean as the prediction for any x in that bin
+4. Connect the bin midpoints to visualize the fitted curve
+
+This is the purest example of "fixed bin size" - we literally fix the bin width and compute local averages.
+
+### Creating the Bin Smoother Function
+
+```{r create-f-true-ref}
+# Create f_true reference data frame (used for faceted plots)
+f_true_ref <- data.frame(x = df_train$x, f_true = f_true)
+```
+
+```{r bin-smoother-function}
+# Function to compute bin smoother predictions
+bin_smoother <- function(x, y, bin_width) {
+  # Define bin boundaries
+  x_min <- min(x)
+  x_max <- max(x)
+  breaks <- seq(x_min, x_max + bin_width, by = bin_width)
+  
+  # Assign each observation to a bin
+  bins <- cut(x, breaks = breaks, include.lowest = TRUE, right = FALSE)
+  
+  # Calculate mean y for each bin
+  bin_means <- tapply(y, bins, mean, na.rm = TRUE)
+  bin_midpoints <- tapply(x, bins, function(z) mean(range(z)))
+  
+  # Create prediction for each original x
+  y_pred <- bin_means[as.character(bins)]
+  
+  # Return results
+  list(
+    x = x,
+    y_pred = as.numeric(y_pred),
+    bin_midpoints = as.numeric(bin_midpoints),
+    bin_means = as.numeric(bin_means),
+    breaks = breaks
+  )
+}
+```
+
+### Bin Width = 1 (Very Narrow - Highly Flexible)
+
+With very narrow bins, each bin contains few observations, so the estimate is heavily influenced by noise.
+
+```{r bin-width1}
+bin_w1 <- bin_smoother(df_train$x, df_train$y, bin_width = 1)
+df_train$bin_w1 <- bin_w1$y_pred
+```
+
+```{r plot-bin1, echo=FALSE}
+# Create data for bin visualization
+bin_df1 <- data.frame(
+  midpoint = bin_w1$bin_midpoints,
+  mean_y = bin_w1$bin_means
+) %>% na.omit()
+
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_vline(xintercept = bin_w1$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
+  geom_point(data = bin_df1, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 3) +
+  geom_line(data = bin_df1, aes(x = midpoint, y = mean_y), 
+            color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Bin Smoother with Bin Width = 1 (Very Flexible)",
+    subtitle = "Green: Bin means connected | Red dashed: True relationship | Gray: Bin boundaries",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With bin width = 1, the fitted curve is very **wiggly** - it captures the noise in the data, not just the underlying pattern. This is **overfitting**.
+
+### Bin Width = 2 (Narrow)
+
+```{r bin-width2}
+bin_w2 <- bin_smoother(df_train$x, df_train$y, bin_width = 2)
+df_train$bin_w2 <- bin_w2$y_pred
+```
+
+```{r plot-bin2, echo=FALSE}
+bin_df2 <- data.frame(
+  midpoint = bin_w2$bin_midpoints,
+  mean_y = bin_w2$bin_means
+) %>% na.omit()
+
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_vline(xintercept = bin_w2$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
+  geom_point(data = bin_df2, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 3) +
+  geom_line(data = bin_df2, aes(x = midpoint, y = mean_y), 
+            color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Bin Smoother with Bin Width = 2",
+    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+### Bin Width = 4 (Medium)
+
+```{r bin-width4}
+bin_w4 <- bin_smoother(df_train$x, df_train$y, bin_width = 4)
+df_train$bin_w4 <- bin_w4$y_pred
+```
+
+```{r plot-bin4, echo=FALSE}
+bin_df4 <- data.frame(
+  midpoint = bin_w4$bin_midpoints,
+  mean_y = bin_w4$bin_means
+) %>% na.omit()
+
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_vline(xintercept = bin_w4$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
+  geom_point(data = bin_df4, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 3) +
+  geom_line(data = bin_df4, aes(x = midpoint, y = mean_y), 
+            color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Bin Smoother with Bin Width = 4 (Medium)",
+    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With medium bins, we start to see a smoother curve that still captures some of the oscillation.
+
+### Bin Width = 7 (Wide)
+
+```{r bin-width7}
+bin_w7 <- bin_smoother(df_train$x, df_train$y, bin_width = 7)
+df_train$bin_w7 <- bin_w7$y_pred
+```
+
+```{r plot-bin7, echo=FALSE}
+bin_df7 <- data.frame(
+  midpoint = bin_w7$bin_midpoints,
+  mean_y = bin_w7$bin_means
+) %>% na.omit()
+
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_vline(xintercept = bin_w7$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
+  geom_point(data = bin_df7, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 3) +
+  geom_line(data = bin_df7, aes(x = midpoint, y = mean_y), 
+            color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Bin Smoother with Bin Width = 7 (Wide)",
+    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With wide bins, the curve becomes very **smooth** but misses the detailed oscillation - this is **underfitting**.
+
+### Bin Width = 10 (Very Wide)
+
+```{r bin-width10}
+bin_w10 <- bin_smoother(df_train$x, df_train$y, bin_width = 10)
+df_train$bin_w10 <- bin_w10$y_pred
+```
+
+```{r plot-bin10, echo=FALSE}
+bin_df10 <- data.frame(
+  midpoint = bin_w10$bin_midpoints,
+  mean_y = bin_w10$bin_means
+) %>% na.omit()
+
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_vline(xintercept = bin_w10$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
+  geom_point(data = bin_df10, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 3) +
+  geom_line(data = bin_df10, aes(x = midpoint, y = mean_y), 
+            color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Bin Smoother with Bin Width = 10 (Very Wide)",
+    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With very wide bins, we get essentially a step function that completely misses the pattern.
+
+### Comparing All Bin Widths
+
+```{r plot-bins-all, echo=FALSE, fig.height=10}
+# Create comparison dataframes
+all_bins <- bind_rows(
+  bin_df1 %>% mutate(Width = "Width = 1"),
+  bin_df2 %>% mutate(Width = "Width = 2"),
+  bin_df4 %>% mutate(Width = "Width = 4"),
+  bin_df7 %>% mutate(Width = "Width = 7"),
+  bin_df10 %>% mutate(Width = "Width = 10")
+)
+
+# Create base data for points
+base_data <- df_train %>% 
+  select(x, y) %>%
+  crossing(Width = c("Width = 1", "Width = 2", "Width = 4", "Width = 7", "Width = 10"))
+
+ggplot() +
+  geom_point(data = base_data, aes(x = x, y = y), alpha = 0.2, color = "steelblue") +
+  geom_line(data = base_data %>% left_join(f_true_ref, by = "x"), 
+            aes(x = x, y = f_true), color = "red", size = 0.8, linetype = "dashed") +
+  geom_point(data = all_bins, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 2.5) +
+  geom_line(data = all_bins, aes(x = midpoint, y = mean_y), 
+            color = "darkgreen", size = 1.2) +
+  facet_wrap(~ Width, ncol = 2) +
+  labs(
+    title = "Bin Smoother: Effect of Bin Width on Flexibility",
+    subtitle = "Red dashed: True relationship | Green: Bin means",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+### Key Insight: The Bias-Variance Trade-off in Action
+
+| Bin Width | Flexibility | Bias | Variance | Result |
+|-----------|-------------|------|----------|--------|
+| Narrow (1-2) | High | Low | High | Wiggly, overfits |
+| Medium (4) | Balanced | Medium | Medium | Reasonable |
+| Wide (7-10) | Low | High | Low | Smooth, underfits |
+
+The **bin width is the hyperparameter** that controls this trade-off:
+
+- **Narrow bins**: Each bin has few points → high variance in the mean estimate
+- **Wide bins**: Local patterns are averaged away → high bias
+
+### From Bin Smoother to LOESS: Why Improve?
+
+The bin smoother has several **limitations**:
+
+1. **Discontinuities**: The fitted function jumps at bin boundaries
+2. **No weighting**: All points in a bin contribute equally, even those at edges
+3. **Inefficient**: Information at bin boundaries is not shared between adjacent bins
+4. **Step function**: Connecting midpoints helps, but the underlying prediction is still piecewise constant
+
+**LOESS improves on this by:**
+
+1. Using **overlapping windows** centered at each prediction point
+2. **Weighting** observations by distance (closer points matter more)
+3. Fitting **local polynomials** instead of just computing means
+4. Producing a **smooth continuous curve**
+
+Now let's see how LOESS addresses these limitations...
+
+# Part 3: LOESS (Locally Estimated Scatterplot Smoothing)
+
+## How LOESS Works
+
+LOESS (also called LOWESS) fits **local polynomial regressions** weighted by distance. For each point $x_0$ where we want to predict:
+
+**Step 1**: Define a neighborhood around $x_0$ using the **span** parameter
+
+**Step 2**: Calculate weights using a kernel function (typically tricube):
+$$w_i = \left(1 - \left|\frac{x_i - x_0}{d(x_0)}\right|^3\right)^3$$
+where $d(x_0)$ is the distance to the farthest point in the neighborhood.
+
+**Step 3**: Fit a weighted polynomial regression (usually degree 1 or 2)
+
+**Step 4**: Use the fitted value at $x_0$ as the prediction
+
+**Step 5**: Repeat for all prediction points
+
+## The Span Hyperparameter
+
+The **span** controls what fraction of data points are included in each local neighborhood:
+
+- **Small span** (e.g., 0.1): Uses only 10% of nearest points → very flexible, may overfit
+- **Large span** (e.g., 0.9): Uses 90% of points → smoother, may underfit
+- Span = 1.0: Approaches global regression
+
+Let's see how different spans affect the fit:
+
+## LOESS with Span = 0.1 (Very Flexible)
+
+```{r loess-span01}
+loess_01 <- loess(y ~ x, data = df_train, span = 0.1)
+df_train$loess_01 <- predict(loess_01)
+```
+
+```{r plot-loess01, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = loess_01), color = "darkgreen", size = 1.2) +
+  labs(
+    title = "LOESS with Span = 0.1 (Very Flexible)",
+    subtitle = "Green: LOESS fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With span = 0.1, each local regression uses only 10% of the data. The fit is very wiggly and captures noise as well as signal.
+
+## LOESS with Span = 0.3 (Moderately Flexible)
+
+```{r loess-span03}
+loess_03 <- loess(y ~ x, data = df_train, span = 0.3)
+df_train$loess_03 <- predict(loess_03)
+```
+
+```{r plot-loess03, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = loess_03), color = "purple", size = 1.2) +
+  labs(
+    title = "LOESS with Span = 0.3 (Moderately Flexible)",
+    subtitle = "Purple: LOESS fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With span = 0.3, the fit is smoother but still captures the oscillating pattern reasonably well.
+
+## LOESS with Span = 0.5 (Balanced)
+
+```{r loess-span05}
+loess_05 <- loess(y ~ x, data = df_train, span = 0.5)
+df_train$loess_05 <- predict(loess_05)
+```
+
+```{r plot-loess05, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = loess_05), color = "orange", size = 1.2) +
+  labs(
+    title = "LOESS with Span = 0.5 (Balanced)",
+    subtitle = "Orange: LOESS fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## LOESS with Span = 0.75 (Smooth)
+
+```{r loess-span075}
+loess_075 <- loess(y ~ x, data = df_train, span = 0.75)
+df_train$loess_075 <- predict(loess_075)
+```
+
+```{r plot-loess075, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = loess_075), color = "brown", size = 1.2) +
+  labs(
+    title = "LOESS with Span = 0.75 (Smooth)",
+    subtitle = "Brown: LOESS fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With span = 0.75, the fit is quite smooth and starts to lose some of the oscillating detail.
+
+## Comparing All LOESS Spans
+
+```{r plot-loess-all, echo=FALSE, fig.height=8}
+# Create f_true for reference line
+f_true_ref <- data.frame(x = df_train$x, f_true = f_true)
+
+df_loess_compare <- df_train %>%
+  select(x, y, loess_01, loess_03, loess_05, loess_075) %>%
+  pivot_longer(cols = starts_with("loess"), 
+               names_to = "Span", 
+               values_to = "Fitted") %>%
+  mutate(Span = case_when(
+    Span == "loess_01" ~ "Span = 0.1",
+    Span == "loess_03" ~ "Span = 0.3",
+    Span == "loess_05" ~ "Span = 0.5",
+    Span == "loess_075" ~ "Span = 0.75"
+  )) %>%
+  left_join(f_true_ref, by = "x")
+
+ggplot(df_loess_compare, aes(x = x)) +
+  geom_point(aes(y = y), alpha = 0.3, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 0.8, linetype = "dashed") +
+  geom_line(aes(y = Fitted), color = "darkgreen", size = 1.2) +
+  facet_wrap(~ Span, ncol = 2) +
+  labs(
+    title = "LOESS: Effect of Span on Model Flexibility",
+    subtitle = "Red dashed: True relationship | Green: LOESS fit",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## LOESS: Train vs Test Performance
+
+Let's evaluate each LOESS model on test data:
+
+```{r loess-test-eval}
+# Predictions on test data
+pred_loess_01 <- predict(loess_01, newdata = df_test)
+pred_loess_03 <- predict(loess_03, newdata = df_test)
+pred_loess_05 <- predict(loess_05, newdata = df_test)
+pred_loess_075 <- predict(loess_075, newdata = df_test)
+
+loess_performance <- data.frame(
+  Model = c("LOESS (span=0.1)", "LOESS (span=0.3)", 
+            "LOESS (span=0.5)", "LOESS (span=0.75)"),
+  Train_RMSE = c(
+    calc_rmse(df_train$y, df_train$loess_01),
+    calc_rmse(df_train$y, df_train$loess_03),
+    calc_rmse(df_train$y, df_train$loess_05),
+    calc_rmse(df_train$y, df_train$loess_075)
+  ),
+  Test_RMSE = c(
+    calc_rmse(df_test$y, pred_loess_01),
+    calc_rmse(df_test$y, pred_loess_03),
+    calc_rmse(df_test$y, pred_loess_05),
+    calc_rmse(df_test$y, pred_loess_075)
+  )
+)
+
+loess_performance$Overfit_Gap <- loess_performance$Test_RMSE - loess_performance$Train_RMSE
+
+kable(loess_performance, 
+      caption = "LOESS Performance: Effect of Span on Overfitting",
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Observations:**
+
+- Smaller span → lower training RMSE (more flexible)
+- Smaller span → larger overfitting gap
+- Test RMSE helps identify the **optimal** span
+
+## LOESS Summary
+
+**Advantages:**
+
+- No need to specify functional form
+- Adapts to local patterns in the data
+- Works well for exploratory data analysis
+
+**Disadvantages:**
+
+- Computationally intensive (fits many local regressions)
+- Doesn't extrapolate well beyond training data range
+- Single hyperparameter (span) must be chosen
+
+**Hyperparameter: Span**
+
+- Controls the trade-off between bias and variance
+- Smaller span = more variance, less bias (may overfit)
+- Larger span = less variance, more bias (may underfit)
+- Typical starting point: span = 0.75 (R's default)
+
+# Part 4: Regression Splines
+
+## What are Splines?
+
+Splines are **piecewise polynomials** that are joined at points called **knots**. Unlike global polynomials, splines:
+
+- Fit different polynomial segments in different regions
+- Ensure smooth transitions at knot locations
+- Provide local flexibility without global instability
+
+## Types of Splines
+
+**Linear Splines**: Piecewise linear functions, continuous but with "kinks" at knots
+
+**Cubic Splines**: Piecewise cubic polynomials with smooth joins (continuous first and second derivatives)
+
+**B-Splines (Basis Splines)**: A numerically stable basis for representing splines
+
+**Natural Splines**: Cubic splines with additional constraints to be linear at the boundaries (prevents edge instability)
+
+## The Degrees of Freedom Hyperparameter
+
+In spline regression, **degrees of freedom (df)** controls flexibility:
+
+- **df = 1**: Linear (no knots)
+- **df = 3**: Allows one "wave" 
+- **df = 5**: Allows more complex curves
+- **Higher df**: More knots, more flexibility
+
+The relationship between df and number of knots depends on the spline type:
+
+- For cubic B-splines: `df = number of knots + degree` (where degree = 3 for cubic)
+
+## B-Splines: The Workhorse of Spline Regression
+
+B-splines create a **basis** of functions that we use as predictors in regression. The `bs()` function in R generates this basis:
+
+```{r bspline-basis, echo=FALSE, fig.height=5}
+# Visualize B-spline basis functions
+x_grid <- seq(0, 20, length.out = 200)
+basis_df5 <- bs(x_grid, df = 5)
+
+basis_long <- data.frame(
+  x = rep(x_grid, ncol(basis_df5)),
+  value = as.vector(basis_df5),
+  basis = rep(paste0("Basis ", 1:ncol(basis_df5)), each = length(x_grid))
+)
+
+ggplot(basis_long, aes(x = x, y = value, color = basis)) +
+  geom_line(size = 1) +
+  labs(
+    title = "B-Spline Basis Functions (df = 5)",
+    subtitle = "Each colored line is one basis function used in regression",
+    x = "X",
+    y = "Basis Function Value",
+    color = "Basis"
+  ) +
+  theme_minimal()
+```
+
+The final prediction is a weighted combination of these basis functions, where weights are estimated via OLS.
+
+## Spline with df = 3 (Low Flexibility)
+
+```{r spline-df3}
+model_spline_3 <- lm(y ~ bs(x, df = 3), data = df_train)
+df_train$spline_3 <- predict(model_spline_3)
+```
+
+```{r plot-spline3, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = spline_3), color = "darkgreen", size = 1.2) +
+  labs(
+    title = "B-Spline Regression (df = 3)",
+    subtitle = "Green: Spline fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With only 3 degrees of freedom, the spline cannot capture the oscillating pattern.
+
+## Spline with df = 5 (Moderate Flexibility)
+
+```{r spline-df5}
+model_spline_5 <- lm(y ~ bs(x, df = 5), data = df_train)
+df_train$spline_5 <- predict(model_spline_5)
+```
+
+```{r plot-spline5, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = spline_5), color = "purple", size = 1.2) +
+  labs(
+    title = "B-Spline Regression (df = 5)",
+    subtitle = "Purple: Spline fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## Spline with df = 10 (Good Flexibility)
+
+```{r spline-df10}
+model_spline_10 <- lm(y ~ bs(x, df = 10), data = df_train)
+df_train$spline_10 <- predict(model_spline_10)
+```
+
+```{r plot-spline10, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = spline_10), color = "orange", size = 1.2) +
+  labs(
+    title = "B-Spline Regression (df = 10)",
+    subtitle = "Orange: Spline fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With df = 10, the spline captures the oscillating pattern quite well.
+
+## Spline with df = 20 (High Flexibility)
+
+```{r spline-df20}
+model_spline_20 <- lm(y ~ bs(x, df = 20), data = df_train)
+df_train$spline_20 <- predict(model_spline_20)
+```
+
+```{r plot-spline20, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = spline_20), color = "brown", size = 1.2) +
+  labs(
+    title = "B-Spline Regression (df = 20)",
+    subtitle = "Brown: Spline fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## Spline with df = 50 (Very High Flexibility)
+
+```{r spline-df50}
+model_spline_50 <- lm(y ~ bs(x, df = 50), data = df_train)
+df_train$spline_50 <- predict(model_spline_50)
+```
+
+```{r plot-spline50, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = spline_50), color = "darkblue", size = 1.2) +
+  labs(
+    title = "B-Spline Regression (df = 50)",
+    subtitle = "Blue: Spline fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+With df = 50, the spline starts to overfit, capturing noise as well as signal.
+
+## Comparing All Spline Models
+
+```{r plot-spline-all, echo=FALSE, fig.height=10}
+df_spline_compare <- df_train %>%
+  select(x, y, spline_3, spline_5, spline_10, spline_20, spline_50) %>%
+  pivot_longer(cols = starts_with("spline"), 
+               names_to = "df", 
+               values_to = "Fitted") %>%
+  mutate(df = case_when(
+    df == "spline_3" ~ "df = 3",
+    df == "spline_5" ~ "df = 5",
+    df == "spline_10" ~ "df = 10",
+    df == "spline_20" ~ "df = 20",
+    df == "spline_50" ~ "df = 50"
+  )) %>%
+  left_join(f_true_ref, by = "x")
+
+ggplot(df_spline_compare, aes(x = x)) +
+  geom_point(aes(y = y), alpha = 0.3, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 0.8, linetype = "dashed") +
+  geom_line(aes(y = Fitted), color = "darkgreen", size = 1.2) +
+  facet_wrap(~ df, ncol = 2) +
+  labs(
+    title = "Splines: Effect of Degrees of Freedom on Model Flexibility",
+    subtitle = "Red dashed: True relationship | Green: Spline fit",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## Splines: Train vs Test Performance
+
+```{r spline-test-eval}
+# Predictions on test data
+pred_spline_3 <- predict(model_spline_3, newdata = df_test)
+pred_spline_5 <- predict(model_spline_5, newdata = df_test)
+pred_spline_10 <- predict(model_spline_10, newdata = df_test)
+pred_spline_20 <- predict(model_spline_20, newdata = df_test)
+pred_spline_50 <- predict(model_spline_50, newdata = df_test)
+
+spline_performance <- data.frame(
+  Model = c("Spline (df=3)", "Spline (df=5)", "Spline (df=10)", 
+            "Spline (df=20)", "Spline (df=50)"),
+  Train_RMSE = c(
+    calc_rmse(df_train$y, df_train$spline_3),
+    calc_rmse(df_train$y, df_train$spline_5),
+    calc_rmse(df_train$y, df_train$spline_10),
+    calc_rmse(df_train$y, df_train$spline_20),
+    calc_rmse(df_train$y, df_train$spline_50)
+  ),
+  Test_RMSE = c(
+    calc_rmse(df_test$y, pred_spline_3),
+    calc_rmse(df_test$y, pred_spline_5),
+    calc_rmse(df_test$y, pred_spline_10),
+    calc_rmse(df_test$y, pred_spline_20),
+    calc_rmse(df_test$y, pred_spline_50)
+  )
+)
+
+spline_performance$Overfit_Gap <- spline_performance$Test_RMSE - spline_performance$Train_RMSE
+
+kable(spline_performance, 
+      caption = "Spline Performance: Effect of df on Overfitting",
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## Natural Splines: Stable at Boundaries
+
+Natural splines add **linearity constraints** at the boundaries, which can improve stability:
+
+```{r natural-spline}
+model_ns_10 <- lm(y ~ ns(x, df = 10), data = df_train)
+df_train$ns_10 <- predict(model_ns_10)
+
+# Predict on test
+pred_ns_10 <- predict(model_ns_10, newdata = df_test)
+```
+
+```{r plot-ns, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = spline_10), color = "orange", size = 1, alpha = 0.7) +
+  geom_line(aes(y = ns_10), color = "darkgreen", size = 1.2) +
+  labs(
+    title = "Natural Spline vs B-Spline (df = 10)",
+    subtitle = "Green: Natural spline | Orange: B-spline | Red dashed: True",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+Natural splines behave more sensibly near the edges of the data, which is important for prediction.
+
+## Smoothing Splines: Automatic df Selection
+
+**Smoothing splines** take a different approach: instead of specifying knots, we:
+
+1. Allow a knot at every data point (maximum flexibility)
+2. Add a **penalty** for roughness (second derivative)
+3. Use cross-validation to select the optimal penalty
+
+```{r smooth-spline}
+model_smooth <- smooth.spline(df_train$x, df_train$y)
+df_train$smooth <- predict(model_smooth, df_train$x)$y
+
+# Effective degrees of freedom selected by CV
+```
+
+The smoothing spline automatically selected **`r round(model_smooth$df, 1)`** effective degrees of freedom.
+
+```{r plot-smooth, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(aes(y = smooth), color = "darkgreen", size = 1.2) +
+  labs(
+    title = paste0("Smoothing Spline (auto df = ", round(model_smooth$df, 1), ")"),
+    subtitle = "Green: Smoothing spline fit | Red dashed: True relationship",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+## Splines Summary
+
+**Advantages:**
+
+- More stable than high-degree polynomials
+- Local flexibility through piecewise construction
+- Natural splines handle boundaries well
+- Smoothing splines provide automatic tuning
+
+**Disadvantages:**
+
+- Need to choose number and placement of knots (for regression splines)
+- Can still overfit with too many degrees of freedom
+
+**Key Hyperparameter: Degrees of Freedom**
+
+- Controls model flexibility
+- Lower df → smoother, may underfit
+- Higher df → more flexible, may overfit
+- Use test set or cross-validation to select
+
+# Part 5: Model Comparison and the Bias-Variance Trade-off
+
+## Comprehensive Model Comparison
+
+Let's compare all the models we've discussed on test data:
+
+```{r final-comparison}
+# Gather all model performance
+pred_smooth <- predict(model_smooth, df_test$x)$y
+
+all_performance <- data.frame(
+  Model = c(
+    "Linear", "Poly(3)", "Poly(10)", "Poly(19)",
+    "LOESS (span=0.3)", "LOESS (span=0.5)",
+    "Spline (df=5)", "Spline (df=10)", "Spline (df=20)",
+    "Natural Spline (df=10)", "Smoothing Spline (auto)"
+  ),
+  Type = c(
+    rep("Parametric", 4),
+    rep("Nonparametric", 7)
+  ),
+  Test_RMSE = c(
+    calc_rmse(df_test$y, pred_linear),
+    calc_rmse(df_test$y, pred_poly3),
+    calc_rmse(df_test$y, pred_poly10),
+    calc_rmse(df_test$y, pred_poly19),
+    calc_rmse(df_test$y, pred_loess_03),
+    calc_rmse(df_test$y, pred_loess_05),
+    calc_rmse(df_test$y, pred_spline_5),
+    calc_rmse(df_test$y, pred_spline_10),
+    calc_rmse(df_test$y, pred_spline_20),
+    calc_rmse(df_test$y, pred_ns_10),
+    calc_rmse(df_test$y, pred_smooth)
+  )
+)
+
+all_performance <- all_performance %>%
+  arrange(Test_RMSE)
+
+kable(all_performance, 
+      caption = "All Models Ranked by Test RMSE",
+      digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  row_spec(1, bold = TRUE, color = "white", background = "#27ae60")
+```
+
+## The Bias-Variance Trade-off
+
+Every prediction model faces a fundamental trade-off:
+
+**Bias**: Error from wrong assumptions (e.g., assuming linearity when relationship is curved)
+
+**Variance**: Error from sensitivity to training data fluctuations
+
+$$\text{Expected Test Error} = \text{Bias}^2 + \text{Variance} + \text{Irreducible Error}$$
+
+```{r bias-variance-visual, echo=FALSE, fig.height=5}
+# Create conceptual illustration
+complexity <- seq(1, 10, by = 0.1)
+bias_sq <- 100 / complexity
+variance <- complexity^1.5
+total <- bias_sq + variance + 50  # 50 = irreducible error
+
+bv_data <- data.frame(
+  Complexity = rep(complexity, 4),
+  Error = c(bias_sq, variance, rep(50, length(complexity)), total),
+  Component = rep(c("Bias²", "Variance", "Irreducible Error", "Total Test Error"), 
+                  each = length(complexity))
+)
+
+ggplot(bv_data, aes(x = Complexity, y = Error, color = Component, linetype = Component)) +
+  geom_line(size = 1.2) +
+  geom_vline(xintercept = 3.5, linetype = "dotted", color = "gray40", size = 1) +
+  annotate("text", x = 3.7, y = 150, label = "Optimal\nComplexity", 
+           hjust = 0, size = 3.5, color = "gray40") +
+  scale_color_manual(values = c("Bias²" = "#e74c3c", "Variance" = "#3498db", 
+                                 "Irreducible Error" = "#95a5a6", "Total Test Error" = "#2c3e50")) +
+  scale_linetype_manual(values = c("Bias²" = "solid", "Variance" = "solid", 
+                                    "Irreducible Error" = "dashed", "Total Test Error" = "solid")) +
+  labs(
+    title = "The Bias-Variance Trade-off",
+    subtitle = "Optimal model complexity minimizes total test error",
+    x = "Model Complexity",
+    y = "Error",
+    color = "Component",
+    linetype = "Component"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Key Insights:**
+
+- Simple models (low complexity): High bias, low variance → underfitting
+- Complex models (high complexity): Low bias, high variance → overfitting
+- Optimal model: Balances bias and variance to minimize total test error
+
+## How Each Method Controls Complexity
+
+| Method | Hyperparameter | Less Complex | More Complex |
+|--------|---------------|--------------|--------------|
+| Polynomial | Degree | Low degree (1, 2) | High degree (10, 20) |
+| LOESS | Span | Large span (0.9) | Small span (0.1) |
+| Splines | df | Low df (3, 5) | High df (20, 50) |
+| k-NN* | k | Large k (50, 100) | Small k (1, 3) |
+
+*k-NN will be covered in a future lecture
+
+## Preview: k-Nearest Neighbors (k-NN)
+
+While LOESS and splines use **fixed bin size** (a window of specified width), **k-Nearest Neighbors** uses **fixed sample size**:
+
+- For each prediction point, find the k closest training observations
+- Average their outcomes (regression) or take majority vote (classification)
+- Hyperparameter k controls flexibility: small k → flexible, large k → smooth
+
+k-NN is conceptually simple but powerful, and will be covered in detail in a separate lecture. The key difference from LOESS/splines:
+
+- LOESS/Splines: "Use all points within this distance"
+- k-NN: "Use the closest k points, however far they are"
+
+# Summary and Key Takeaways
+
+## Parametric vs Nonparametric Models
+
+| Aspect | Parametric | Nonparametric |
+|--------|------------|---------------|
+| **Functional form** | Specified (e.g., linear) | Learned from data |
+| **Parameters** | Fixed number | Grows with sample size |
+| **Flexibility** | Limited by assumed form | Adapts to any pattern |
+| **Interpretability** | High (coefficients meaningful) | Lower (no simple coefficients) |
+| **Data requirement** | Works with smaller samples | Needs more data |
+| **Risk** | Misspecification if form is wrong | Overfitting if too flexible |
+
+## Hyperparameters: The Key to Nonparametric Models
+
+Every nonparametric method has a **hyperparameter** that controls the bias-variance trade-off:
+
+| Method | Hyperparameter | What it controls |
+|--------|---------------|------------------|
+| LOESS | span | Fraction of data in local window |
+| B-Splines | df | Number of basis functions (knots) |
+| Smoothing Splines | λ (auto-selected) | Penalty for roughness |
+| k-NN | k | Number of neighbors |
+
+**Critical insight**: These hyperparameters are NOT estimated from training data - they must be **selected** using test data or cross-validation.
+
+## Practical Guidelines
+
+1. **Start simple**: Linear models are interpretable and often work well
+2. **Check for nonlinearity**: Plot residuals, compare to flexible models
+3. **Use test sets**: Training error is always optimistic
+4. **Compare multiple methods**: No single method is best for all problems
+5. **Balance flexibility and stability**: More complex isn't always better
+
+## What's Next?
+
+In upcoming lectures, we will cover:
+
+- **k-Nearest Neighbors**: Fixed sample size nonparametric method
+- **Cross-Validation**: Systematic hyperparameter selection
+- **Regularization**: Adding penalties to prevent overfitting
+- **Tree-Based Methods**: Decision trees and random forests
+
+---
+
+## R Session Information
+
+```{r session-info}
+sessionInfo()
+```

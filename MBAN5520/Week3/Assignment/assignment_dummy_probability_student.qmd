@@ -1,0 +1,513 @@
+---
+title: "Dummy Variables and Probability Models Assignment"
+subtitle: "Predicting High-Price Homes in Ames, Iowa - DUE on November 21"
+author: "MBAN5520 - Statistics"
+date: today
+format: 
+  html:
+    embed-resources: true
+    code-background: true
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+    fig-width: 9
+    fig-height: 6
+    #number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(broom)
+library(patchwork)
+
+# Set seed for reproducibility
+set.seed(5520)
+```
+
+The submission instructions are the same as in Assignment 1.
+  
+# Introduction
+
+## Assignment Objectives
+
+In this assignment, you will apply dummy variable encoding and probability models to predict high-price homes using the Ames Housing dataset. You will:
+
+- Create and interpret dummy variables for categorical predictors
+- Understand interaction effects between variables
+- Build and compare Linear Probability Models (LPM) and Logistic Regression
+- Calculate and interpret marginal effects (AME vs MEM)
+- Evaluate classification performance using confusion matrices
+- Select optimal thresholds based on business objectives
+
+## Dataset: Ames Housing Data
+
+The Ames Housing dataset contains residential home sales in Ames, Iowa. For this assignment, we will predict which homes sell for "high prices" (above the 95th percentile).
+
+---
+
+# Part A: Data Loading and Binary Outcome Creation
+
+## Load and Prepare Data
+
+```{r load-data}
+# Load the dataset
+housing <- read.csv("AmesHousing.csv")
+
+# Calculate 95th percentile of sale price
+price_95 <- quantile(housing$SalePrice, 0.95)
+
+# Create binary outcome: HighPrice (1 if above 95th percentile, 0 otherwise)
+housing_clean <- housing %>%
+  mutate(
+    HighPrice = ifelse(SalePrice > price_95, 1, 0)
+  ) %>%
+  # Select relevant variables
+  select(
+    HighPrice,
+    SalePrice,
+    Gr.Liv.Area,
+    Overall.Qual,
+    Year.Built,
+    Neighborhood,
+    Central.Air,
+    Garage.Type,
+    Garage.Cars,
+    Full.Bath,
+    Bedroom.AbvGr
+  ) %>%
+  # Remove missing values
+  drop_na()
+
+# Display dimensions
+dim(housing_clean)
+
+# Show first few rows
+head(housing_clean, 10) %>%
+  kable(caption = "First 10 Observations",
+        digits = 0) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+### **Question 1**: What is the 95th percentile threshold for high prices? What percentage of homes are classified as "high price"?
+
+**Answer:** [Your answer here]
+
+```{r outcome-distribution}
+# Calculate statistics about the binary outcome
+
+
+```
+
+### **Question 2**: Why might we want to predict high-price homes rather than predict the exact sale price?
+
+**Answer:** [Your answer here - discuss business applications like targeting luxury buyers, resource allocation, etc.]
+
+---
+
+# Part B: Dummy Variable Models
+
+## Single Dummy Variable: Central Air
+
+Central Air is a binary variable (Y/N). Let's create a dummy variable and model its effect on high-price probability.
+
+```{r central-air-dummy}
+# Create dummy variable for Central Air (Y=1, N=0)
+housing_clean <- housing_clean %>%
+  mutate(
+    CentralAir_Dummy = ifelse(Central.Air == "Y", 1, 0)
+  )
+
+# Fit linear regression with dummy variable
+model_air <- lm(HighPrice ~ CentralAir_Dummy, data = housing_clean)
+summary(model_air)
+```
+
+### **Question 3**: Interpret the coefficient for CentralAir_Dummy. What does it tell us about houses with central air?
+
+**Answer:** [Interpret the coefficient - it represents the difference in probability between houses with and without central air]
+
+```{r verify-air-means}
+# Verify by calculating group means
+
+
+```
+
+### **Question 4**: Verify that the coefficient equals the difference in mean HighPrice between the two groups.
+
+**Answer:** [Show the calculation]
+
+## Multiple Category Dummy Variables: Neighborhood
+
+Neighborhood has many categories. We need to create k-1 dummy variables.
+
+```{r neighborhood-dummies}
+# Check how many neighborhoods we have
+table(housing_clean$Neighborhood)
+
+# For simplicity, focus on top 5 most common neighborhoods
+top_neighborhoods <- housing_clean %>%
+  count(Neighborhood, sort = TRUE) %>%
+  head(5) %>%
+  pull(Neighborhood)
+
+# Filter to top neighborhoods
+housing_top_nbhd <- housing_clean %>%
+  filter(Neighborhood %in% top_neighborhoods)
+
+# Fit model with neighborhood dummies (R creates them automatically with factor)
+model_nbhd <- lm(HighPrice ~ factor(Neighborhood), data = housing_top_nbhd)
+summary(model_nbhd)
+```
+
+### **Question 5**: Which neighborhood is used as the reference category? How can you tell?
+
+**Answer:** [Identify the reference category - it's the one not shown in the output]
+
+### **Question 6**: Interpret the coefficient for one of the neighborhood dummies. What does it tell us?
+
+**Answer:** [Interpret - coefficient shows difference from reference neighborhood]
+
+```{r neighborhood-means}
+# Calculate mean HighPrice by neighborhood
+
+
+```
+
+### **Question 7**: Which neighborhood has the highest proportion of high-price homes? Which has the lowest?
+
+**Answer:** [Your answer here]
+
+## Interaction: Neighborhood × Living Area
+
+Do larger homes command a bigger premium in certain neighborhoods? Let's test with an interaction term.
+
+```{r interaction-nbhd-area}
+# Fit model with interaction (using just 2 neighborhoods for clarity)
+housing_two_nbhd <- housing_top_nbhd %>%
+  filter(Neighborhood %in% c(top_neighborhoods[1], top_neighborhoods[2]))
+
+model_interact <- lm(HighPrice ~ Gr.Liv.Area + factor(Neighborhood) + 
+                       Gr.Liv.Area:factor(Neighborhood), 
+                     data = housing_two_nbhd)
+summary(model_interact)
+```
+
+### **Question 8**: Is the interaction term statistically significant? What does this tell us about how living area affects high prices across neighborhoods?
+
+**Answer:** [Interpret the interaction - does the effect of living area differ by neighborhood?]
+
+```{r visualize-interaction}
+# Visualize the interaction
+
+
+```
+
+---
+
+# Part C: Linear Probability Model (LPM)
+
+Now let's model the probability of a house being high-priced using LPM.
+
+```{r lpm-model}
+# Fit LPM with multiple predictors
+lpm_model <- lm(HighPrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+                  CentralAir_Dummy + Garage.Cars, 
+                data = housing_clean)
+summary(lpm_model)
+```
+
+### **Question 9**: Interpret the coefficient for Gr.Liv.Area. What does it represent in the context of LPM?
+
+**Answer:** [Interpret as marginal effect on probability]
+
+### **Question 10**: Interpret the coefficient for Overall.Qual. How much does the probability of being high-price increase for each additional quality point?
+
+**Answer:** [Interpret the marginal effect]
+
+## Checking for LPM Boundary Violations
+
+```{r lpm-predictions}
+# Get predicted probabilities
+housing_clean$lpm_pred <- predict(lpm_model)
+
+# Check for violations
+violations_below <- sum(housing_clean$lpm_pred < 0)
+violations_above <- sum(housing_clean$lpm_pred > 1)
+
+# Show summary statistics
+
+
+```
+
+### **Question 11**: How many predictions fall outside the [0,1] bounds? What percentage is this?
+
+**Answer:** [Calculate and interpret]
+
+```{r lpm-boundary-plot}
+# Visualize predictions including violations
+
+
+```
+
+### **Question 12**: Looking at your visualization, at what values of the predictors do we see boundary violations? Why is this problematic?
+
+**Answer:** [Discuss where violations occur and why this is an issue]
+
+---
+
+# Part D: Logistic Regression
+
+Now let's fit a logistic regression model with the same predictors.
+
+```{r logistic-model}
+# Fit logistic regression
+logit_model <- glm(HighPrice ~ Gr.Liv.Area + Overall.Qual + Year.Built + 
+                     CentralAir_Dummy + Garage.Cars,
+                   data = housing_clean,
+                   family = binomial)
+summary(logit_model)
+```
+
+### **Question 13**: What is the sign of the coefficient for Gr.Liv.Area? What does this tell us about the relationship?
+
+**Answer:** [Interpret the direction of the relationship]
+
+## Odds Ratios
+
+```{r odds-ratios}
+# Calculate odds ratios (exponentiate coefficients)
+
+
+```
+
+### **Question 14**: Calculate and interpret the odds ratio for Overall.Qual. If quality increases by 1 point, how do the odds of being high-price change?
+
+**Answer:** [Calculate exp(coefficient) and interpret]
+
+### **Question 15**: For a 500 sq ft increase in living area, how do the odds of being high-price change?
+
+**Answer:** [Calculate exp(coefficient × 500) and interpret]
+
+## Marginal Effects: AME vs MEM
+
+```{r marginal-effects}
+# Get fitted probabilities
+housing_clean$logit_prob <- predict(logit_model, type = "response")
+
+# Calculate marginal effect for each observation
+# Formula: ME = β × p × (1-p)
+beta_area <- coef(logit_model)["Gr.Liv.Area"]
+
+
+
+# Average Marginal Effect (AME)
+
+
+# Marginal Effect at Means (MEM)
+
+
+```
+
+### **Question 16**: What is the Average Marginal Effect (AME) of Gr.Liv.Area? Interpret this in plain language.
+
+**Answer:** [Interpret AME - average effect across all observations]
+
+### **Question 17**: What is the Marginal Effect at Means (MEM)? How does it compare to AME and why are they different?
+
+**Answer:** [Compare AME vs MEM and explain the difference]
+
+### **Question 18**: Calculate the marginal effect for a specific house with p=0.5. How does this compare to AME and MEM?
+
+**Answer:** [Calculate ME at p=0.5 using formula β × 0.5 × 0.5]
+
+```{r visualize-me}
+# Visualize how marginal effect varies
+
+
+```
+
+---
+
+# Part E: Model Comparison
+
+## Side-by-Side Predictions
+
+```{r compare-models}
+# Compare predicted probabilities
+
+
+```
+
+### **Question 19**: Create a scatter plot comparing LPM and Logistic predictions. Where do they differ most?
+
+**Answer:** [Create plot and describe where models diverge]
+
+```{r model-performance}
+# Calculate correlation and RMSE for both models
+
+
+```
+
+### **Question 20**: Which model has better correlation with the actual outcome? Better RMSE?
+
+**Answer:** [Compare performance metrics]
+
+---
+
+# Part F: Classification and Threshold Selection
+
+## Default Threshold (0.5)
+
+```{r confusion-50}
+# Classify using 0.5 threshold
+housing_clean$logit_class_50 <- ifelse(housing_clean$logit_prob > 0.5, 1, 0)
+
+# Create confusion matrix
+
+
+# Calculate metrics
+
+
+```
+
+### **Question 21**: Using threshold=0.5, what is the accuracy? Precision? Recall?
+
+**Answer:** [Calculate and interpret each metric]
+
+### **Question 22**: In this context, what is the cost of a False Positive vs False Negative? Which error is more serious for a real estate agent?
+
+**Answer:** [Discuss business implications of each type of error]
+
+## Optimal Threshold Selection
+
+```{r optimal-threshold}
+# Function to calculate metrics at any threshold
+
+
+# Test multiple thresholds
+
+
+# Find threshold that maximizes F1-score
+
+
+```
+
+### **Question 23**: What is the optimal threshold for maximizing F1-score? How does this compare to the default 0.5?
+
+**Answer:** [Identify optimal threshold and explain why it differs from 0.5]
+
+```{r threshold-tradeoff}
+# Plot metrics vs threshold
+
+
+```
+
+### **Question 24**: Create a plot showing how Precision and Recall change with the threshold. Describe the trade-off.
+
+**Answer:** [Create plot and describe the precision-recall trade-off]
+
+## Cost-Based Threshold
+
+Suppose a real estate agent faces these costs:
+- **False Negative** (miss a high-price home): Lost commission of $6,000
+- **False Positive** (waste time on normal home): Lost opportunity cost of $300
+
+```{r cost-threshold}
+# Calculate expected cost for each threshold
+
+
+# Find cost-minimizing threshold
+
+
+```
+
+### **Question 25**: What is the optimal threshold when considering these costs? How does it compare to the F1-maximizing threshold?
+
+**Answer:** [Calculate optimal threshold and explain why it's different]
+
+### **Question 26**: Why would the cost-based threshold be different from the F1-maximizing threshold?
+
+**Answer:** [Explain how asymmetric costs change the optimal decision point]
+
+---
+
+# Part G: Prediction on New Data
+
+```{r train-test}
+# Create train-test split (75-25)
+
+
+# Fit models on training data
+
+
+# Predict on test data
+
+
+```
+
+### **Question 27**: What is the test set accuracy for logistic regression? How does it compare to training accuracy?
+
+**Answer:** [Calculate and compare - check for overfitting]
+
+### **Question 28**: For a house with 2000 sq ft living area, quality rating of 8, built in 2005, with central air and a 2-car garage, what is the predicted probability of being high-price?
+
+**Answer:** [Use the model to make this specific prediction]
+
+```{r test-confusion}
+# Create confusion matrix for test set
+
+
+```
+
+### **Question 29**: Compare the confusion matrix on test data vs training data. Are the results similar?
+
+**Answer:** [Compare and discuss model stability]
+
+---
+
+# Part H: Summary and Conclusions
+
+### **Question 30**: Based on your analysis, which three factors are most important in predicting high-price homes?
+
+**Answer:** [Identify top predictors based on coefficients, significance, and marginal effects]
+
+### **Question 31**: Would you recommend using LPM or Logistic Regression for this problem? Why?
+
+**Answer:** [Provide recommendation with justification]
+
+### **Question 32**: If you were a real estate agent, how would you use this model? What threshold would you choose and why?
+
+**Answer:** [Discuss practical application and threshold selection rationale]
+
+### **Question 33**: What are the limitations of this model? What additional variables or improvements would you suggest?
+
+**Answer:** [Critical evaluation and suggestions for improvement]
+
+---
+
+# Submission Checklist
+
+Before submitting, ensure you have:
+
+- [ ] Answered all 33 questions with complete explanations
+- [ ] All code chunks execute without errors
+- [ ] Created all requested visualizations
+- [ ] Interpreted coefficients in context
+- [ ] Calculated marginal effects correctly
+- [ ] Compared LPM vs Logistic thoroughly
+- [ ] Evaluated classification performance
+- [ ] Selected and justified optimal threshold
+- [ ] Document renders to HTML successfully
+
+---
+
+**Good luck with your analysis!**
