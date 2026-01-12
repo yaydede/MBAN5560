@@ -1,8 +1,9 @@
 ---
 title: "From Parametric to Nonparametric Models"
-author: "MBAN 5560 - Machine Learning"
+subtitle: "MBAN 5560 - Machine Learning & AI - Winter 2026"
+author: "Dr. Aydede"
 date: today
-format: 
+format:
   html:
     embed-resources: true
     code-background: true
@@ -371,17 +372,27 @@ bin_df1 <- data.frame(
   mean_y = bin_w1$bin_means
 ) %>% na.omit()
 
+# Create data for horizontal bin mean lines
+bin_width <- 1
+bin_segments1 <- data.frame(
+  x_start = bin_w1$breaks[-length(bin_w1$breaks)],
+  x_end = bin_w1$breaks[-1],
+  y_mean = bin_w1$bin_means
+) %>% na.omit()
+
 ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = bin_w1$breaks, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_segment(data = bin_segments1, aes(x = x_start, xend = x_end, y = y_mean, yend = y_mean),
+               color = "darkgreen", size = 1.2) +
   geom_point(alpha = 0.4, color = "steelblue") +
   geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
-  geom_vline(xintercept = bin_w1$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
-  geom_point(data = bin_df1, aes(x = midpoint, y = mean_y), 
-             color = "darkgreen", size = 3) +
   geom_line(data = bin_df1, aes(x = midpoint, y = mean_y), 
-            color = "darkgreen", size = 1.2) +
+            color = "orange", size = 1) +
+  geom_point(data = bin_df1, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 2) +
   labs(
     title = "Bin Smoother with Bin Width = 1 (Very Flexible)",
-    subtitle = "Green: Bin means connected | Red dashed: True relationship | Gray: Bin boundaries",
+    subtitle = "Green: Bin means | Orange: Connected midpoints | Red dashed: True relationship",
     x = "X",
     y = "Y"
   ) +
@@ -403,17 +414,25 @@ bin_df2 <- data.frame(
   mean_y = bin_w2$bin_means
 ) %>% na.omit()
 
+bin_segments2 <- data.frame(
+  x_start = bin_w2$breaks[-length(bin_w2$breaks)],
+  x_end = bin_w2$breaks[-1],
+  y_mean = bin_w2$bin_means
+) %>% na.omit()
+
 ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = bin_w2$breaks, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_segment(data = bin_segments2, aes(x = x_start, xend = x_end, y = y_mean, yend = y_mean),
+               color = "darkgreen", size = 1.2) +
   geom_point(alpha = 0.4, color = "steelblue") +
   geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
-  geom_vline(xintercept = bin_w2$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
-  geom_point(data = bin_df2, aes(x = midpoint, y = mean_y), 
-             color = "darkgreen", size = 3) +
   geom_line(data = bin_df2, aes(x = midpoint, y = mean_y), 
-            color = "darkgreen", size = 1.2) +
+            color = "orange", size = 1) +
+  geom_point(data = bin_df2, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 2) +
   labs(
     title = "Bin Smoother with Bin Width = 2",
-    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    subtitle = "Green: Bin means | Orange: Connected midpoints | Red dashed: True relationship",
     x = "X",
     y = "Y"
   ) +
@@ -433,17 +452,25 @@ bin_df4 <- data.frame(
   mean_y = bin_w4$bin_means
 ) %>% na.omit()
 
+bin_segments4 <- data.frame(
+  x_start = bin_w4$breaks[-length(bin_w4$breaks)],
+  x_end = bin_w4$breaks[-1],
+  y_mean = bin_w4$bin_means
+) %>% na.omit()
+
 ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = bin_w4$breaks, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_segment(data = bin_segments4, aes(x = x_start, xend = x_end, y = y_mean, yend = y_mean),
+               color = "darkgreen", size = 1.2) +
   geom_point(alpha = 0.4, color = "steelblue") +
   geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
-  geom_vline(xintercept = bin_w4$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
-  geom_point(data = bin_df4, aes(x = midpoint, y = mean_y), 
-             color = "darkgreen", size = 3) +
   geom_line(data = bin_df4, aes(x = midpoint, y = mean_y), 
-            color = "darkgreen", size = 1.2) +
+            color = "orange", size = 1) +
+  geom_point(data = bin_df4, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 2) +
   labs(
     title = "Bin Smoother with Bin Width = 4 (Medium)",
-    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    subtitle = "Green: Bin means | Orange: Connected midpoints | Red dashed: True relationship",
     x = "X",
     y = "Y"
   ) +
@@ -465,17 +492,25 @@ bin_df7 <- data.frame(
   mean_y = bin_w7$bin_means
 ) %>% na.omit()
 
+bin_segments7 <- data.frame(
+  x_start = bin_w7$breaks[-length(bin_w7$breaks)],
+  x_end = bin_w7$breaks[-1],
+  y_mean = bin_w7$bin_means
+) %>% na.omit()
+
 ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = bin_w7$breaks, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_segment(data = bin_segments7, aes(x = x_start, xend = x_end, y = y_mean, yend = y_mean),
+               color = "darkgreen", size = 1.2) +
   geom_point(alpha = 0.4, color = "steelblue") +
   geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
-  geom_vline(xintercept = bin_w7$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
-  geom_point(data = bin_df7, aes(x = midpoint, y = mean_y), 
-             color = "darkgreen", size = 3) +
   geom_line(data = bin_df7, aes(x = midpoint, y = mean_y), 
-            color = "darkgreen", size = 1.2) +
+            color = "orange", size = 1) +
+  geom_point(data = bin_df7, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 2) +
   labs(
     title = "Bin Smoother with Bin Width = 7 (Wide)",
-    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    subtitle = "Green: Bin means | Orange: Connected midpoints | Red dashed: True relationship",
     x = "X",
     y = "Y"
   ) +
@@ -497,17 +532,25 @@ bin_df10 <- data.frame(
   mean_y = bin_w10$bin_means
 ) %>% na.omit()
 
+bin_segments10 <- data.frame(
+  x_start = bin_w10$breaks[-length(bin_w10$breaks)],
+  x_end = bin_w10$breaks[-1],
+  y_mean = bin_w10$bin_means
+) %>% na.omit()
+
 ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = bin_w10$breaks, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_segment(data = bin_segments10, aes(x = x_start, xend = x_end, y = y_mean, yend = y_mean),
+               color = "darkgreen", size = 1.2) +
   geom_point(alpha = 0.4, color = "steelblue") +
   geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
-  geom_vline(xintercept = bin_w10$breaks, color = "gray70", linetype = "dotted", alpha = 0.5) +
-  geom_point(data = bin_df10, aes(x = midpoint, y = mean_y), 
-             color = "darkgreen", size = 3) +
   geom_line(data = bin_df10, aes(x = midpoint, y = mean_y), 
-            color = "darkgreen", size = 1.2) +
+            color = "orange", size = 1) +
+  geom_point(data = bin_df10, aes(x = midpoint, y = mean_y), 
+             color = "darkgreen", size = 2) +
   labs(
     title = "Bin Smoother with Bin Width = 10 (Very Wide)",
-    subtitle = "Green: Bin means connected | Red dashed: True relationship",
+    subtitle = "Green: Bin means | Orange: Connected midpoints | Red dashed: True relationship",
     x = "X",
     y = "Y"
   ) +
@@ -564,23 +607,219 @@ The **bin width is the hyperparameter** that controls this trade-off:
 - **Narrow bins**: Each bin has few points → high variance in the mean estimate
 - **Wide bins**: Local patterns are averaged away → high bias
 
-### From Bin Smoother to LOESS: Why Improve?
+### Beyond the Mean: What Else Can We Do Inside Each Bin?
 
-The bin smoother has several **limitations**:
+The simple bin smoother uses the **mean** within each bin - the simplest possible approach. But we can do more! Let's explore progressively sophisticated methods.
 
-1. **Discontinuities**: The fitted function jumps at bin boundaries
-2. **No weighting**: All points in a bin contribute equally, even those at edges
-3. **Inefficient**: Information at bin boundaries is not shared between adjacent bins
-4. **Step function**: Connecting midpoints helps, but the underlying prediction is still piecewise constant
+### Option 1: Local Linear Regression within Bins
 
-**LOESS improves on this by:**
+Instead of computing the mean, we can fit a **linear regression** within each bin:
 
-1. Using **overlapping windows** centered at each prediction point
-2. **Weighting** observations by distance (closer points matter more)
-3. Fitting **local polynomials** instead of just computing means
-4. Producing a **smooth continuous curve**
+$$\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x \quad \text{(for } x \text{ in this bin)}$$
 
-Now let's see how LOESS addresses these limitations...
+```{r local-linear-bin, echo=FALSE}
+# Fit local linear regression within each bin (using bin width = 2)
+bin_width_demo <- 2
+breaks_demo <- seq(0, 20, by = bin_width_demo)
+bins_demo <- cut(df_train$x, breaks = breaks_demo, include.lowest = TRUE, right = FALSE)
+
+# Calculate midpoints for each bin
+midpoints_demo <- breaks_demo[-length(breaks_demo)] + bin_width_demo / 2
+bins_mid <- cut(midpoints_demo, breaks = breaks_demo, include.lowest = TRUE, right = FALSE)
+
+# Fit local linear models and predict at midpoints
+local_linear_midpoints <- numeric(length(midpoints_demo))
+for (i in seq_along(midpoints_demo)) {
+  b <- bins_mid[i]
+  if (!is.na(b)) {
+    in_bin <- bins_demo == b
+    if (sum(in_bin, na.rm = TRUE) > 1) {
+      local_model <- lm(y ~ x, data = df_train[in_bin, ])
+      local_linear_midpoints[i] <- predict(local_model, newdata = data.frame(x = midpoints_demo[i]))
+    }
+  }
+}
+
+# Create dataframe for plotting
+local_linear_df <- data.frame(midpoint = midpoints_demo, y_pred = local_linear_midpoints) %>%
+  filter(!is.na(y_pred) & y_pred != 0)
+```
+
+```{r plot-local-linear, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = breaks_demo, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(data = local_linear_df, aes(x = midpoint, y = y_pred), 
+            color = "orange", size = 1) +
+  geom_point(data = local_linear_df, aes(x = midpoint, y = y_pred), 
+             color = "darkgreen", size = 2.5) +
+  labs(
+    title = "Local Linear Regression within Bins (Bin Width = 2)",
+    subtitle = "Green points: Predicted at midpoint from local linear | Orange: Connected | Red dashed: True",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+Local linear regression within bins captures **local slopes**, but still has discontinuities at bin boundaries.
+
+### Option 2: Local Polynomial Regression within Bins
+
+We can add even more flexibility by fitting **polynomials** within each bin:
+
+$$\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x + \hat{\beta}_2 x^2 \quad \text{(for } x \text{ in this bin)}$$
+
+```{r local-poly-bin, echo=FALSE}
+# Fit local polynomial (degree 2) within each bin and predict at midpoints
+local_poly_midpoints <- numeric(length(midpoints_demo))
+for (i in seq_along(midpoints_demo)) {
+  b <- bins_mid[i]
+  if (!is.na(b)) {
+    in_bin <- bins_demo == b
+    if (sum(in_bin, na.rm = TRUE) > 3) {
+      local_model <- lm(y ~ poly(x, 2, raw = TRUE), data = df_train[in_bin, ])
+      local_poly_midpoints[i] <- predict(local_model, newdata = data.frame(x = midpoints_demo[i]))
+    } else if (sum(in_bin, na.rm = TRUE) > 1) {
+      local_model <- lm(y ~ x, data = df_train[in_bin, ])
+      local_poly_midpoints[i] <- predict(local_model, newdata = data.frame(x = midpoints_demo[i]))
+    }
+  }
+}
+
+# Create dataframe for plotting
+local_poly_df <- data.frame(midpoint = midpoints_demo, y_pred = local_poly_midpoints) %>%
+  filter(!is.na(y_pred) & y_pred != 0)
+```
+
+```{r plot-local-poly, echo=FALSE}
+ggplot(df_train, aes(x = x, y = y)) +
+  geom_vline(xintercept = breaks_demo, color = "gray80", linetype = "solid", size = 0.3) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  geom_line(data = local_poly_df, aes(x = midpoint, y = y_pred), 
+            color = "orange", size = 1) +
+  geom_point(data = local_poly_df, aes(x = midpoint, y = y_pred), 
+             color = "purple", size = 2.5) +
+  labs(
+    title = "Local Polynomial Regression within Bins (Bin Width = 2)",
+    subtitle = "Purple points: Predicted at midpoint from local polynomial | Orange: Connected | Red dashed: True",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+Local polynomials can capture **curvature** within each bin, but discontinuities remain at boundaries.
+
+### Option 3: Adding Kernel Weights
+
+A key limitation of all methods so far: **all points in a bin contribute equally**. But intuitively, points closer to where we're predicting should matter more!
+
+**Kernel functions** assign weights based on distance:
+
+$$w_i = K\left(\frac{x_i - x_0}{h}\right)$$
+
+where:
+
+- $x_0$ is the point where we're making a prediction
+- $h$ is the bandwidth (like bin width)
+- $K(\cdot)$ is a kernel function that gives higher weight to nearby points
+
+```{r kernel-viz, echo=FALSE, fig.height=4}
+# Visualize different kernel functions
+u <- seq(-1.5, 1.5, by = 0.01)
+
+# Define kernel functions
+uniform <- ifelse(abs(u) <= 1, 0.5, 0)
+gaussian <- dnorm(u)
+epanechnikov <- ifelse(abs(u) <= 1, 0.75 * (1 - u^2), 0)
+tricube <- ifelse(abs(u) <= 1, (70/81) * (1 - abs(u)^3)^3, 0)
+
+kernel_df <- data.frame(
+  u = rep(u, 4),
+  weight = c(uniform, gaussian, epanechnikov, tricube),
+  kernel = rep(c("Uniform (Bin Smoother)", "Gaussian", "Epanechnikov", "Tricube (LOESS)"), 
+               each = length(u))
+)
+
+ggplot(kernel_df, aes(x = u, y = weight, color = kernel)) +
+  geom_line(size = 1.2) +
+  labs(
+    title = "Kernel Functions: How to Weight Observations by Distance",
+    subtitle = "u = standardized distance from prediction point | Higher weight = more influence",
+    x = "Standardized Distance (u)",
+    y = "Weight",
+    color = "Kernel"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Key insight**: The uniform kernel (rectangular) is what the simple bin smoother uses - equal weights inside the bin, zero outside. Other kernels give smooth, distance-based weights.
+
+### Comparing All Local Methods
+
+Let's compare the three approaches on the same data:
+
+```{r compare-local-methods, echo=FALSE, fig.height=5}
+# Create comparison
+compare_df <- data.frame(
+  x = rep(df_train$x, 3),
+  y = rep(df_train$y, 3),
+  Method = rep(c("Local Mean (Bin Smoother)", "Local Linear", "Local Polynomial"), 
+               each = nrow(df_train))
+)
+
+# Get bin means for comparison (use bin_w2 since we're using bin width = 2)
+compare_df$fitted <- c(
+  df_train$bin_w2,
+  approx(local_linear_df$midpoint, local_linear_df$y_pred, df_train$x)$y,
+  approx(local_poly_df$midpoint, local_poly_df$y_pred, df_train$x)$y
+)
+
+compare_df <- compare_df %>% left_join(f_true_ref, by = "x")
+
+ggplot(compare_df, aes(x = x)) +
+  geom_point(aes(y = y), alpha = 0.3, color = "steelblue") +
+  geom_line(aes(y = f_true), color = "red", size = 0.8, linetype = "dashed") +
+  geom_line(aes(y = fitted), color = "darkgreen", size = 1.2) +
+  facet_wrap(~ Method, ncol = 3) +
+  labs(
+    title = "Comparing Local Methods (All with Bin Width = 2)",
+    subtitle = "Red dashed: True relationship | Green: Fitted curve",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+### Summary: Evolution of Local Smoothing Methods
+
+| Method | What's computed in each region | Weighting | Result |
+|--------|-------------------------------|-----------|--------|
+| **Bin Mean** | Constant (mean) | Equal | Step function |
+| **Local Linear** | Linear regression | Equal | Piecewise linear |
+| **Local Polynomial** | Polynomial regression | Equal | Piecewise polynomial |
+| **Kernel Smoother** | Weighted mean | Distance-based | Smooth curve |
+| **LOESS** | Weighted polynomial | Distance-based (tricube) | Smooth curve |
+
+### The Remaining Problem: Discontinuities
+
+All methods so far use **non-overlapping bins**. This causes jumps at bin boundaries. The solution?
+
+**Use overlapping windows centered at each prediction point!**
+
+This is exactly what LOESS does:
+
+1. For **each point** where you want to predict, create a window centered there
+2. Include a fraction of the data (controlled by **span**)
+3. Apply **kernel weights** (tricube) based on distance
+4. Fit a **local polynomial** using weighted least squares
+5. Use the fitted value at the center point
+
+This produces a **smooth, continuous curve** with no discontinuities.
 
 # Part 3: LOESS (Locally Estimated Scatterplot Smoothing)
 
