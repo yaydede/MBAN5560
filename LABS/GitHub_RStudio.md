@@ -74,7 +74,39 @@ Git is a separate program that must be installed on your computer. RStudio uses 
 
 ---
 
-## Step 3: Create a Personal Access Token (PAT)
+## Step 3: Tell Git Who You Are ⚠️ IMPORTANT
+
+Git needs to know your name and email address to track who made each change. **This step is required** - without it, you'll get errors later!
+
+### Configure Your Identity:
+
+1. Open **RStudio**
+2. Click on the **Terminal** tab (next to Console at the bottom of RStudio)
+3. Type the following command (replace with YOUR name) and press Enter:
+   ```bash
+   git config --global user.name "Your Full Name"
+   ```
+   For example: `git config --global user.name "Jane Smith"`
+
+4. Type the following command (replace with YOUR email) and press Enter:
+   ```bash
+   git config --global user.email "your.email@example.com"
+   ```
+   **Important:** Use the same email address you used to create your GitHub account!
+
+### Verify Your Identity is Set:
+
+Still in the Terminal, type:
+```bash
+git config --global user.name
+git config --global user.email
+```
+
+You should see your name and email displayed back to you. ✅
+
+---
+
+## Step 4: Create a Personal Access Token (PAT)
 
 A Personal Access Token is like a special password that allows RStudio to communicate with your GitHub account. GitHub no longer accepts regular passwords for this.
 
@@ -99,9 +131,9 @@ A Personal Access Token is like a special password that allows RStudio to commun
 9. **Fill in the token settings:**
    - **Note**: Give it a name like `RStudio-Access` or `My-Laptop-Git`
    - **Expiration**: Choose **90 days** (or "Custom" to match your course duration)
-   - **Select scopes**: Check the box next to **`repo`** (this will auto-select all the sub-options)
-
-   ![repo scope](https://docs.github.com/assets/cb-34248/mw-1440/images/help/settings/token_scopes.webp)
+   - **Select scopes**: Check the boxes next to:
+     - ✅ **`repo`** (this will auto-select all the sub-options)
+     - ✅ **`user:email`** (scroll down to find this under "user")
 
 10. Scroll down and click **"Generate token"**
 
@@ -119,11 +151,11 @@ GitHub will show you the token **ONLY ONCE**. It looks like a long string starti
 
 ---
 
-## Step 4: Configure RStudio for Git
+## Step 5: Configure RStudio for Git and GitHub
 
-Now let's connect RStudio to Git and GitHub.
+Now let's connect RStudio to Git and store your GitHub credentials.
 
-### 4.1 Tell RStudio Where Git Is:
+### 5.1 Tell RStudio Where Git Is:
 
 1. Open **RStudio**
 2. Go to **Tools → Global Options** (on Mac: **RStudio → Preferences**)
@@ -137,57 +169,54 @@ Now let's connect RStudio to Git and GitHub.
 
 6. Click **"OK"**
 
-### 4.2 Store Your PAT in RStudio (Recommended Method):
+### 5.2 Store Your PAT (GitHub Credentials):
 
-This method stores your token securely so you don't have to enter it every time.
+This stores your token securely so you don't have to enter it every time.
 
-1. In the RStudio **Console** (bottom-left panel), install the `usethis` package by typing:
+1. In the RStudio **Console** (bottom-left panel), install the required packages:
    ```r
    install.packages("usethis")
+   install.packages("gitcreds")
    ```
-   Press Enter and wait for it to install.
+   Press Enter and wait for them to install.
 
-2. Load the package:
+2. Now store your PAT by running:
    ```r
-   library(usethis)
+   gitcreds::gitcreds_set()
    ```
 
-3. Open your R environment file:
-   ```r
-   usethis::edit_r_environ()
-   ```
-   A new file called `.Renviron` will open.
+3. When prompted, **paste your Personal Access Token** (the one you copied in Step 4) and press Enter.
 
-4. In this file, add a new line:
-   ```
-   GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   ```
-   Replace `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` with YOUR actual token (the one you copied in Step 3).
+4. You should see a confirmation message that your credentials have been stored. ✅
 
-5. **Save the file** (Ctrl+S or Cmd+S)
+### 5.3 Verify Everything Works:
 
-6. **Close the `.Renviron` file**
-
-7. **⚠️ RESTART RStudio completely** (close it and reopen it)
-
-### 4.3 Verify Everything Works:
-
-After restarting RStudio, run this in the Console:
+Run this in the Console to check your setup:
 ```r
 library(usethis)
 usethis::git_sitrep()
 ```
 
 This gives you a "situation report". Look for:
-- ✅ Git is installed
-- ✅ Your GitHub username appears
-- ✅ A PAT is found
+- ✅ **Name** and **Email** show your information (from Step 3)
+- ✅ **GitHub user** shows your GitHub username
+- ✅ **Personal access token** shows `<discovered>`
 
-If you see warnings or errors, don't worry! The most common issues are addressed in the Troubleshooting section at the end.
+**Example of a successful setup:**
+```
+── Git global (user)
+• Name: 'Jane Smith'
+• Email: 'jane.smith@email.com'
+── GitHub user
+• GitHub user: 'janesmith'
+• Personal access token for 'https://github.com': <discovered>
+```
+
+If you see errors, check the Troubleshooting section at the end.
 
 ---
 
-## Step 5: Clone a Repository
+## Step 6: Clone a Repository
 
 "Cloning" means downloading a copy of a repository from GitHub to your computer. This is the most common task you'll do as a student.
 
@@ -225,7 +254,7 @@ If you see warnings or errors, don't worry! The most common issues are addressed
 
 ---
 
-## Step 6: The Daily Workflow
+## Step 7: The Daily Workflow
 
 Once you have a repository cloned, here's how you work with it:
 
@@ -314,10 +343,9 @@ After editing and saving:
 ### "Authentication failed" or "Invalid credentials"
 
 **Solution:** Your PAT may be missing, expired, or incorrect.
-1. Generate a new PAT on GitHub (Step 3)
-2. Update your `.Renviron` file (Step 4.2)
-3. Make sure there are no extra spaces in the GITHUB_PAT line
-4. Restart RStudio completely
+1. Generate a new PAT on GitHub (Step 4)
+2. Run `gitcreds::gitcreds_set()` in the Console and paste the new token
+3. Try your operation again
 
 ### "Repository not found" when cloning
 
@@ -339,14 +367,12 @@ After editing and saving:
 - The project must be linked to a Git repository
 - Check: File → New Project → Version Control → Git (to clone a repo)
 
-### "Please tell me who you are" error
+### git_sitrep() shows warnings about "Token lacks recommended scopes"
 
-**Solution:** Git needs to know your identity. Run these commands in the RStudio Terminal:
-```bash
-git config --global user.email "your.email@example.com"
-git config --global user.name "Your Name"
-```
-Use the email associated with your GitHub account.
+**Solution:** Your PAT is missing some scopes but will likely still work for basic operations. If you need full functionality:
+1. Go to GitHub → Settings → Developer settings → Personal access tokens
+2. Generate a new token with `repo` AND `user:email` scopes checked
+3. Run `gitcreds::gitcreds_set()` and paste the new token
 
 ---
 
