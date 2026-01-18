@@ -37,7 +37,7 @@ In this lecture, we explore the fundamental distinction between **parametric** a
 4. Understand the role of hyperparameters in controlling model flexibility
 5. Recognize the bias-variance trade-off in model selection
 
-# Part 1: Review of Parametric Models
+# Review of Parametric Models
 
 ## The Prediction Problem
 
@@ -62,14 +62,14 @@ But what if the true relationship is **not linear**?
 Let's create a dataset where we **know** the true relationship is nonlinear:
 
 ```{r simulate-data}
-set.seed(1)
+set.seed(10)
 
 # True data generating process (DGP)
 x <- seq(from = 0, to = 20, by = 0.1)
 f_true <- 500 + 20*x - 90*sin(x)  # Nonlinear deterministic component
 
 n <- length(x)
-y <- f_true + rnorm(n, mean = 0, sd = 100)  # Add random noise
+y <- f_true + rnorm(n, mean = 0, sd = 150)  # Add random noise
 
 df_train <- data.frame(y = y, x = x)
 ```
@@ -221,10 +221,10 @@ Training RMSE decreases with complexity - but does this mean better predictions?
 To properly evaluate models, we need **new data** that the model hasn't seen:
 
 ```{r create-test}
-set.seed(2)
+set.seed(30)
 x_test <- seq(from = 0, to = 20, by = 0.1)
 f_true_test <- 500 + 20*x_test - 90*sin(x_test)
-y_test <- f_true_test + rnorm(length(x_test), mean = 0, sd = 100)
+y_test <- f_true_test + rnorm(length(x_test), mean = 0, sd = 150)
 
 df_test <- data.frame(y = y_test, x = x_test)
 ```
@@ -269,7 +269,7 @@ kable(test_rmse,
 
 The polynomial approach shows us that simply adding more flexibility doesn't always help. We need methods that adapt to data more intelligently.
 
-# Part 2: Introduction to Nonparametric Models
+# Introduction to Nonparametric Models
 
 ## What Makes a Model Nonparametric?
 
@@ -279,11 +279,13 @@ The polynomial approach shows us that simply adding more flexibility doesn't alw
 - Polynomial regression: $f(X) = \sum_{j=0}^{p} \beta_j X^j$ (p+1 parameters)
 - Logistic regression: $\log\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 X$
 
-**Nonparametric models** do NOT assume a specific functional form:
+**Nonparametric methods** do NOT assume a specific functional form:
 
-- The number of "effective parameters" grows with sample size
-- The model **learns** the shape of $f(X)$ from the data
+- No equation with parameters is specified in advance
+- The algorithm **learns** the shape of $f(X)$ directly from the data
 - More flexible, but requires more data
+
+> **Note on terminology**: We often say "nonparametric model" in machine learning (e.g., "k-NN is a nonparametric model"), even though there's no explicit model equation. This is loose but common parlance - it really refers to the **method** or **algorithm** rather than a model in the traditional statistical sense.
 
 ## Two Approaches to Nonparametric Modeling
 
@@ -821,7 +823,193 @@ This is exactly what LOESS does:
 
 This produces a **smooth, continuous curve** with no discontinuities.
 
-# Part 3: LOESS (Locally Estimated Scatterplot Smoothing)
+## How Do Nonparametric Methods Make Predictions?
+
+Before moving to more sophisticated methods, we need to address a fundamental question: **How do nonparametric methods predict for new data?**
+
+### The Parametric Approach: Plug and Compute
+
+In parametric models, prediction is straightforward:
+
+1. **Training phase**: Estimate parameters (e.g., $\hat{\beta}_0 = 500$, $\hat{\beta}_1 = 20$)
+2. **Store**: Just the parameter values (a few numbers)
+3. **Prediction phase**: For any new $X_{new}$, compute $\hat{Y} = \hat{\beta}_0 + \hat{\beta}_1 X_{new}$
+
+The beauty is that once you have the parameters, you can **discard the training data** - you don't need it anymore!
+
+### The Nonparametric Problem: No Equation to Plug Into
+
+With nonparametric methods, there's **no explicit function** $f(X) = ...$  to evaluate. So what do we do?
+
+**The answer: Memory-based prediction**
+
+For the **bin mean method**:
+
+1. **Training phase**: 
+   - Divide X into bins
+   - Compute and **store** the mean Y for each bin (e.g., Bin 1: $\bar{Y}_1 = 520$, Bin 2: $\bar{Y}_2 = 580$, ...)
+   
+2. **Prediction phase** for a new $X_{new}$:
+   - Identify which bin $X_{new}$ falls into
+   - Return the stored mean for that bin
+   - Example: If $X_{new} = 3.5$ falls in Bin 2, predict $\hat{Y} = \bar{Y}_2 = 580$
+
+### Key Insight: We Must Store the Training Information
+
+| Method | What's Stored | How Prediction Works |
+|--------|---------------|---------------------|
+| **Parametric (OLS)** | Parameters ($\hat{\beta}_0, \hat{\beta}_1$) | Plug $X_{new}$ into equation |
+| **Bin Smoother** | Bin boundaries + bin means | Look up which bin, return mean |
+| **k-NN** | ALL training data points | Find k nearest neighbors, average |
+| **LOESS** | ALL training data points | Fit local regression around $X_{new}$ |
+
+This is why nonparametric methods are sometimes called **"memory-based"** or **"instance-based"** learning - they must **retain** the training data (or a summary of it) to make predictions.
+
+### Implications for Practice
+
+1. **Storage**: Nonparametric methods require more memory (you keep the training data)
+2. **Prediction speed**: Each prediction requires computation (not just plugging into an equation)
+3. **Extrapolation**: Predicting outside the training data range is risky - there's no stored information there!
+
+This "memory-based" nature is not a bug, it's a feature - it's what allows nonparametric methods to adapt to **any** pattern in the data without assuming a specific functional form.
+
+### Code Example: How Kernel Smoothing "Memorizes" Training Data
+
+Let's build a simple kernel smoother from scratch to see exactly how nonparametric methods store and use training data for prediction:
+
+```{r kernel-smoother-function}
+# Function to create a kernel smoother
+# This returns a FUNCTION that can make predictions
+create_kernel_smoother <- function(x, y, bandwidth = 0.5, kernel_type = "gaussian") {
+  
+  # Order the data
+  ord <- order(x)
+  x_train <- x[ord]  # Store training x
+  y_train <- y[ord]  # Store training y
+  
+  # Define kernel function (gives higher weight to closer points)
+  kernel_fn <- function(u) dnorm(u, sd = 1)  # Gaussian kernel
+  
+  # This is the prediction function - notice it uses x_train and y_train!
+  predict_fn <- function(new_x) {
+    sapply(new_x, function(x0) {
+      # For each new point, calculate distance to ALL training points
+      scaled_dist <- (x_train - x0) / bandwidth
+      
+      # Apply kernel weights
+      weights <- kernel_fn(scaled_dist)
+      weights <- weights / sum(weights)  # Normalize to sum to 1
+      
+      # Prediction = weighted average of STORED training y values
+      sum(y_train * weights)
+    })
+  }
+  
+  # Return the prediction function along with the stored data
+  list(
+    predict = predict_fn,
+    x_train = x_train,  # Training data is STORED
+    y_train = y_train,  # Training data is STORED
+    bandwidth = bandwidth
+  )
+}
+```
+
+**Key insight: Look at what's returned!** The function returns a list containing:
+
+1. `predict` - a function that can make predictions
+2. `x_train` - the **stored** training X values
+3. `y_train` - the **stored** training Y values
+
+This is the "memorization" - the training data lives inside the returned object!
+
+### Demonstrating the Memorization
+
+Let's use our kernel smoother and see how it makes predictions:
+
+```{r kernel-demo}
+# Create a small training dataset
+set.seed(42)
+x_demo <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+y_demo <- c(2.1, 4.2, 5.8, 8.1, 10.5, 11.9, 14.2, 15.8, 18.3, 20.1)
+
+# "Train" the kernel smoother (really just stores the data)
+my_smoother <- create_kernel_smoother(x_demo, y_demo, bandwidth = 1.5)
+
+# What's inside my_smoother?
+cat("Stored training X:", my_smoother$x_train, "\n")
+cat("Stored training Y:", my_smoother$y_train, "\n")
+cat("Bandwidth:", my_smoother$bandwidth, "\n")
+```
+
+Now let's predict for a new point:
+
+```{r kernel-predict}
+# Predict for a NEW point not in the training data
+new_point <- 5.5
+
+# The prediction function uses the STORED training data
+prediction <- my_smoother$predict(new_point)
+cat("\nPredicting for X =", new_point, "\n")
+cat("Predicted Y =", round(prediction, 2), "\n")
+```
+
+**What just happened during prediction?**
+
+1. The function looked up the stored `x_train` values: `r my_smoother$x_train`
+2. Calculated distances from 5.5 to each stored point
+3. Applied kernel weights (closer points get more weight)
+4. Returned a weighted average of the stored `y_train` values
+
+**Contrast with parametric prediction:**
+
+In linear regression, once you have $\hat{\beta}_0$ and $\hat{\beta}_1$, prediction is just:
+$$\hat{Y} = \hat{\beta}_0 + \hat{\beta}_1 \times X_{new}$$
+
+No need to access any training data! The kernel smoother, however, **must access the stored training data** for every prediction.
+
+```{r kernel-plot, echo=FALSE, fig.height=5}
+# Visualize the kernel smoother
+x_new <- seq(0, 11, by = 0.1)
+y_pred <- my_smoother$predict(x_new)
+
+plot_data <- data.frame(
+  x = c(my_smoother$x_train, x_new),
+  y = c(my_smoother$y_train, y_pred),
+  type = c(rep("Training Data (Stored)", length(my_smoother$x_train)), 
+           rep("Predictions", length(x_new)))
+)
+
+ggplot() +
+  geom_line(data = data.frame(x = x_new, y = y_pred), 
+            aes(x = x, y = y), color = "darkgreen", size = 1.2) +
+  geom_point(data = data.frame(x = my_smoother$x_train, y = my_smoother$y_train),
+             aes(x = x, y = y), color = "steelblue", size = 4) +
+  geom_point(aes(x = new_point, y = prediction), color = "red", size = 5, shape = 17) +
+  annotate("text", x = new_point + 0.5, y = prediction, 
+           label = paste("Prediction at X=5.5:\nY =", round(prediction, 2)), 
+           hjust = 0, color = "red") +
+  labs(
+    title = "Kernel Smoother: Predictions Use Stored Training Data",
+    subtitle = "Blue dots: Stored training data | Green line: Predictions | Red triangle: New prediction",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+### Summary: Why "Memory-Based"?
+
+| Aspect | Parametric (OLS) | Nonparametric (Kernel) |
+|--------|------------------|------------------------|
+| **After training, what's kept?** | Just $\hat{\beta}_0, \hat{\beta}_1$ | ALL training (X, Y) pairs |
+| **Training data needed for prediction?** | No | Yes |
+| **Prediction computation** | One equation evaluation | Distance to ALL training points |
+| **Memory requirement** | O(p) - number of parameters | O(n) - number of training points |
+
+This is the fundamental trade-off: nonparametric methods are more flexible because they "remember" the data, but they require more storage and computation.
+
+# LOESS (Locally Estimated Scatterplot Smoothing)
 
 ## How LOESS Works
 
@@ -1035,7 +1223,7 @@ kable(loess_performance,
 - Larger span = less variance, more bias (may underfit)
 - Typical starting point: span = 0.75 (R's default)
 
-# Part 4: Regression Splines
+# Regression Splines
 
 ## What are Splines?
 
@@ -1057,16 +1245,63 @@ Splines are **piecewise polynomials** that are joined at points called **knots**
 
 ## The Degrees of Freedom Hyperparameter
 
-In spline regression, **degrees of freedom (df)** controls flexibility:
+In spline regression, **degrees of freedom (df)** controls model flexibility. But what exactly is df?
 
-- **df = 1**: Linear (no knots)
-- **df = 3**: Allows one "wave" 
-- **df = 5**: Allows more complex curves
-- **Higher df**: More knots, more flexibility
+### Understanding df, Knots, and Polynomial Degree
 
-The relationship between df and number of knots depends on the spline type:
+There are **three key components** in spline regression:
 
-- For cubic B-splines: `df = number of knots + degree` (where degree = 3 for cubic)
+1. **Degree**: The polynomial degree within each segment (typically 3 for cubic splines - this is fixed)
+2. **Knots**: The breakpoints where polynomial pieces join together
+3. **df**: The total number of parameters (basis functions) in the model
+
+For **B-splines using `bs()` in R**, the relationship is:
+
+$$\text{df} = \text{number of interior knots} + \text{degree}$$
+
+For **cubic B-splines** (degree = 3, the standard choice):
+
+$$\text{df} = \text{number of interior knots} + 3$$
+
+**Rearranging to find the number of knots:**
+
+$$\text{number of interior knots} = \text{df} - 3$$
+
+### Concrete Examples
+
+| df Specified | Polynomial Degree | Number of Interior Knots |
+|--------------|-------------------|--------------------------|
+| df = 3 | 3 (cubic) | 3 - 3 = **0 knots** |
+| df = 5 | 3 (cubic) | 5 - 3 = **2 knots** |
+| df = 10 | 3 (cubic) | 10 - 3 = **7 knots** |
+| df = 20 | 3 (cubic) | 20 - 3 = **17 knots** |
+
+**Key insight:** When you specify `bs(x, df = 10)`, R automatically:
+1. Sets degree = 3 (cubic) by default
+2. Places 10 - 3 = 7 interior knots at quantiles of your x data
+3. Creates 10 basis functions (columns) for your regression
+
+### Why "Interior" Knots?
+
+The knots are placed **inside** the data range (between min(x) and max(x)), not at the boundaries. R places them at evenly-spaced quantiles of your x variable.
+
+```{r show-knots, echo=TRUE}
+# Example: Where does R place knots with df = 10?
+x_example <- seq(0, 20, by = 0.1)
+bs_object <- bs(x_example, df = 10)
+
+# The knots are stored in the attributes
+knot_locations <- attr(bs_object, "knots")
+cat("With df = 10 (cubic), R places", length(knot_locations), "interior knots at:\n")
+cat(round(knot_locations, 2), "\n")
+```
+
+### The Bottom Line
+
+- **df is what you choose** - it's the hyperparameter that controls flexibility
+- **Degree is usually fixed at 3** (cubic) - no need to change it
+- **Knots are automatically placed** by R based on your df choice
+- **Higher df = more knots = more flexibility = risk of overfitting**
 
 ## B-Splines: The Workhorse of Spline Regression
 
@@ -1357,7 +1592,7 @@ ggplot(df_train, aes(x = x, y = y)) +
 - Higher df → more flexible, may overfit
 - Use test set or cross-validation to select
 
-# Part 5: Model Comparison and the Bias-Variance Trade-off
+# Model Comparison and the Bias-Variance Trade-off
 
 ## Comprehensive Model Comparison
 

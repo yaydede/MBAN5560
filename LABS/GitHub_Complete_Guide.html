@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started with Git and GitHub - Complete Guide for RStudio & VS Code</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 20px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        .course-info {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #2980b9;
+            margin-top: 40px;
+            padding: 10px 15px;
+            background-color: #ecf0f1;
+            border-left: 5px solid #3498db;
+            border-radius: 0 8px 8px 0;
+        }
+
+        h3 {
+            color: #27ae60;
+            margin-top: 25px;
+        }
+
+        h4 {
+            color: #8e44ad;
+            margin-top: 20px;
+        }
+
+        .intro-box {
+            background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin: 30px 0;
+        }
+
+        .intro-box h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+
+        .why-box {
+            background-color: #fff;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .why-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .why-box li {
+            padding: 8px 0;
+            padding-left: 35px;
+            position: relative;
+        }
+
+        .why-box li::before {
+            content: "✨";
+            position: absolute;
+            left: 0;
+        }
+
+        .step-box {
+            background-color: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-number {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 35px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        code {
+            background-color: #2c3e50;
+            color: #e74c3c;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            line-height: 1.5;
+        }
+
+        pre code {
+            background: none;
+            color: #ecf0f1;
+            padding: 0;
+        }
+
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .warning-box::before {
+            content: "⚠️ ";
+            font-size: 1.2em;
+        }
+
+        .success-box {
+            background-color: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .success-box::before {
+            content: "✅ ";
+            font-size: 1.2em;
+        }
+
+        .tip-box {
+            background-color: #e7f3ff;
+            border-left: 5px solid #0066cc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .tip-box::before {
+            content: "💡 ";
+            font-size: 1.2em;
+        }
+
+        .critical-box {
+            background-color: #f8d7da;
+            border-left: 5px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .critical-box::before {
+            content: "🚨 ";
+            font-size: 1.2em;
+        }
+
+        ol {
+            counter-reset: step-counter;
+            list-style: none;
+            padding-left: 0;
+        }
+
+        ol > li {
+            counter-increment: step-counter;
+            padding: 10px 0 10px 50px;
+            position: relative;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        ol > li:last-child {
+            border-bottom: none;
+        }
+
+        ol > li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .tabs {
+            display: flex;
+            background-color: #ecf0f1;
+            border-radius: 10px 10px 0 0;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .tab-windows {
+            background-color: #0078d4;
+            color: white;
+        }
+
+        .tab-mac {
+            background-color: #555;
+            color: white;
+        }
+
+        .tab-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 0 0 10px 10px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+
+        .ide-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .ide-box {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .ide-box.rstudio {
+            border-top: 4px solid #75AADB;
+        }
+
+        .ide-box.vscode {
+            border-top: 4px solid #007ACC;
+        }
+
+        .ide-box h4 {
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .workflow-diagram {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .workflow-steps {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .workflow-step {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+        }
+
+        .workflow-arrow {
+            font-size: 1.5em;
+        }
+
+        .troubleshooting {
+            background-color: #fff;
+            border-radius: 10px;
+            margin: 15px 0;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .troubleshooting-header {
+            background-color: #e74c3c;
+            color: white;
+            padding: 15px 20px;
+            font-weight: bold;
+        }
+
+        .troubleshooting-content {
+            padding: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .ide-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .workflow-steps {
+                flex-direction: column;
+            }
+
+            .workflow-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Getting Started with Git and GitHub</h1>
+    <p class="subtitle">A Complete Beginner's Guide for RStudio & VS Code</p>
+
+    <div class="course-info">
+        <strong>MBAN 5560 - Machine Learning & AI - Winter 2026</strong><br>
+        Dr. Aydede
+    </div>
+
+    <div class="intro-box">
+        <h3>👋 Welcome!</h3>
+        <p>This guide will walk you through everything you need to know to start using Git and GitHub with both <strong>RStudio</strong> and <strong>VS Code</strong>. Don't worry if you've never used these tools before – we'll go through each step together, with plenty of pictures and explanations along the way!</p>
+        <p><strong>Take your time.</strong> There's no rush. If you get stuck, that's completely normal! Check the troubleshooting section at the end, or ask for help.</p>
+    </div>
+
+    <h2>📚 Part 1: Understanding Git and GitHub</h2>
+
+    <div class="step-box">
+        <h3>What is Git?</h3>
+        <p>Think of Git as a <strong>super-powered "Track Changes"</strong> feature (like in Microsoft Word), but for all your files. It:</p>
+        <ul>
+            <li>Keeps a complete history of every change you make</li>
+            <li>Lets you go back to any previous version of your work</li>
+            <li>Helps you understand what changed, when, and why</li>
+        </ul>
+        <p><strong>Important:</strong> Git runs on your computer. It's a separate program that both RStudio and VS Code use behind the scenes.</p>
+    </div>
+
+    <div class="step-box">
+        <h3>What is GitHub?</h3>
+        <p>GitHub is a <strong>website that stores your Git projects in the cloud</strong>. Think of it like:</p>
+        <ul>
+            <li>Google Drive or Dropbox, but specifically designed for code</li>
+            <li>A social network for programmers where you can share and collaborate</li>
+            <li>A backup system that keeps your work safe online</li>
+        </ul>
+    </div>
+
+    <div class="why-box">
+        <h3>Why Should You Care?</h3>
+        <ul>
+            <li><strong>📁 Backup:</strong> Your work is safely stored in the cloud – never lose your homework again!</li>
+            <li><strong>🔄 Version History:</strong> Made a mistake? No problem! Go back to any previous version</li>
+            <li><strong>👥 Collaboration:</strong> Work with classmates without emailing files back and forth</li>
+            <li><strong>💼 Professional Skill:</strong> Every tech company uses Git – it's a must-have skill!</li>
+            <li><strong>📋 Portfolio:</strong> Your GitHub profile becomes a portfolio showing your work to future employers</li>
+        </ul>
+    </div>
+
+    <h2>🎯 Part 2: Setting Up (One-Time Setup)</h2>
+
+    <h3>Step 1: Create a GitHub Account</h3>
+    <div class="step-box">
+        <ol>
+            <li>Open your web browser and go to <strong><a href="https://github.com">github.com</a></strong></li>
+            <li>Click the big <strong>"Sign up"</strong> button in the top-right corner</li>
+            <li>Enter your email address (use your university email if you want free Pro features!)</li>
+            <li>Create a strong password</li>
+            <li>Choose a username – <strong>pick something professional!</strong> Future employers will see this
+                <div class="tip-box">Good examples: <code>jane-smith</code>, <code>jsmith2026</code><br>
+                Avoid: <code>xXx_CodingNinja_xXx</code>, <code>partyanimal99</code></div>
+            </li>
+            <li>Complete the verification puzzle (prove you're human!)</li>
+            <li>Click <strong>"Create account"</strong></li>
+            <li>Check your email inbox and click the verification link GitHub sends you</li>
+        </ol>
+        <div class="success-box">You now have a GitHub account! 🎉</div>
+    </div>
+
+    <h3>Step 2: Install Git on Your Computer</h3>
+    <div class="step-box">
+        <p>Remember: <strong>Git is NOT the same as RStudio or VS Code.</strong> It's a separate program that must be installed first.</p>
+
+        <div class="tabs">
+            <div class="tab tab-windows">🪟 Windows</div>
+            <div class="tab tab-mac">🍎 Mac</div>
+        </div>
+
+        <div class="tab-content">
+            <h4>For Windows Users:</h4>
+            <ol>
+                <li>Go to <strong><a href="https://git-scm.com/downloads">git-scm.com/downloads</a></strong></li>
+                <li>Click <strong>"Windows"</strong> – the download starts automatically</li>
+                <li>Find the downloaded file (usually in your Downloads folder) – it's called something like <code>Git-2.x.x-64-bit.exe</code></li>
+                <li>Double-click to run the installer</li>
+                <li><strong>Click "Next" through ALL the screens</strong> – the default options are perfect for beginners!</li>
+                <li>Click <strong>"Install"</strong></li>
+                <li>When it's done, click <strong>"Finish"</strong></li>
+            </ol>
+
+            <h4>For Mac Users:</h4>
+            <ol>
+                <li>Go to <strong><a href="https://git-scm.com/downloads">git-scm.com/downloads</a></strong></li>
+                <li>Click <strong>"macOS"</strong></li>
+                <li>The easiest method is using <strong>Homebrew</strong>. Open <strong>Terminal</strong> (press Cmd+Space, type "Terminal", press Enter)</li>
+                <li>Copy and paste this command, then press Enter:
+                    <pre><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></pre>
+                </li>
+                <li>After Homebrew finishes installing, type this and press Enter:
+                    <pre><code>brew install git</code></pre>
+                </li>
+            </ol>
+            <div class="tip-box"><strong>Alternative for Mac:</strong> You can also download the installer directly from the website and follow the prompts.</div>
+        </div>
+    </div>
+
+    <div class="step-box">
+        <h4>✅ Verify Git is Installed</h4>
+        <p>Let's make sure Git installed correctly:</p>
+        <ol>
+            <li>Open a terminal:
+                <ul>
+                    <li><strong>Windows:</strong> Search for "Git Bash" in the Start menu and open it</li>
+                    <li><strong>Mac:</strong> Open Terminal (Cmd+Space, type "Terminal")</li>
+                </ul>
+            </li>
+            <li>Type this command and press Enter:
+                <pre><code>git --version</code></pre>
+            </li>
+            <li>You should see something like: <code>git version 2.43.0</code></li>
+        </ol>
+        <div class="success-box">If you see a version number, Git is installed correctly! 🎉</div>
+        <div class="warning-box">If you see "command not found" or an error, try restarting your computer and trying again. If it still doesn't work, reinstall Git.</div>
+    </div>
+
+    <h3>Step 3: Tell Git Who You Are</h3>
+    <div class="step-box">
+        <div class="critical-box"><strong>IMPORTANT:</strong> This step is REQUIRED! Without it, you'll get errors later. Git needs to know your name and email to track who made each change.</div>
+
+        <ol>
+            <li>Open a terminal (Git Bash on Windows, Terminal on Mac)</li>
+            <li>Type this command (replace with YOUR name) and press Enter:
+                <pre><code>git config --global user.name "Your Full Name"</code></pre>
+                <p>For example: <code>git config --global user.name "Jane Smith"</code></p>
+            </li>
+            <li>Type this command (replace with YOUR email) and press Enter:
+                <pre><code>git config --global user.email "your.email@example.com"</code></pre>
+                <div class="warning-box"><strong>Important:</strong> Use the SAME email address you used to create your GitHub account!</div>
+            </li>
+        </ol>
+
+        <h4>Verify Your Identity is Set:</h4>
+        <p>Type these commands to check:</p>
+        <pre><code>git config --global user.name
+git config --global user.email</code></pre>
+        <p>You should see your name and email displayed back to you.</p>
+        <div class="success-box">Git now knows who you are! ✅</div>
+    </div>
+
+    <h3>Step 4: Create a Personal Access Token (PAT)</h3>
+    <div class="step-box">
+        <p>A Personal Access Token is like a <strong>special password</strong> that allows RStudio and VS Code to talk to your GitHub account. GitHub no longer accepts regular passwords for this.</p>
+
+        <div class="tip-box"><strong>Think of it like this:</strong> Your GitHub password lets YOU into GitHub via the website. A PAT lets your APPS (like RStudio) into GitHub on your behalf.</div>
+
+        <h4>Generate Your Token:</h4>
+        <ol>
+            <li><strong>Log in to GitHub</strong> at <a href="https://github.com">github.com</a></li>
+            <li><strong>Click your profile picture</strong> in the top-right corner</li>
+            <li>Click <strong>"Settings"</strong> from the dropdown menu</li>
+            <li><strong>Scroll ALL the way down</strong> on the left sidebar and click <strong>"Developer settings"</strong> (it's at the very bottom!)</li>
+            <li>Click <strong>"Personal access tokens"</strong> in the left sidebar</li>
+            <li>Click <strong>"Tokens (classic)"</strong></li>
+            <li>Click <strong>"Generate new token"</strong> button, then <strong>"Generate new token (classic)"</strong></li>
+            <li>You might need to enter your GitHub password again</li>
+            <li><strong>Fill in the token settings:</strong>
+                <ul>
+                    <li><strong>Note:</strong> Give it a descriptive name like <code>RStudio-VSCode-Access</code> or <code>My-Laptop-Git</code></li>
+                    <li><strong>Expiration:</strong> Choose <strong>90 days</strong> (or "Custom" to match your course duration)</li>
+                    <li><strong>Select scopes:</strong> Check the box next to:
+                        <ul>
+                            <li>✅ <strong><code>repo</code></strong> (this will auto-select all sub-options)</li>
+                            <li>✅ <strong><code>user:email</code></strong> (scroll down to find this under "user")</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li>Scroll down and click <strong>"Generate token"</strong></li>
+        </ol>
+
+        <div class="critical-box">
+            <strong>🚨 CRITICAL - COPY YOUR TOKEN RIGHT NOW!</strong><br><br>
+            GitHub will show you the token <strong>ONLY ONCE</strong>. It looks like a long string starting with <code>ghp_</code>.<br><br>
+            <ol>
+                <li><strong>Click the copy button</strong> (📋 two overlapping squares) next to the token</li>
+                <li><strong>Paste it somewhere safe IMMEDIATELY:</strong>
+                    <ul>
+                        <li>A password manager (best option!)</li>
+                        <li>A secure note on your phone</li>
+                        <li>A text file you'll keep safe (not ideal, but okay temporarily)</li>
+                    </ul>
+                </li>
+            </ol>
+            <p><strong>If you lose this token, don't panic!</strong> You can always generate a new one by repeating these steps.</p>
+        </div>
+    </div>
+
+    <h2>🔧 Part 3: Connecting RStudio to GitHub</h2>
+
+    <div class="ide-box rstudio">
+        <h3>🎨 RStudio Setup</h3>
+
+        <h4>Step 1: Tell RStudio Where Git Is</h4>
+        <ol>
+            <li>Open <strong>RStudio</strong></li>
+            <li>Go to <strong>Tools → Global Options</strong> (on Mac: <strong>RStudio → Preferences</strong>)</li>
+            <li>Click <strong>"Git/SVN"</strong> in the left sidebar</li>
+            <li>Make sure <strong>"Enable version control interface for RStudio projects"</strong> is checked ✅</li>
+            <li>Check that the <strong>"Git executable"</strong> field shows a path:
+                <ul>
+                    <li><strong>Windows:</strong> Usually <code>C:/Program Files/Git/bin/git.exe</code></li>
+                    <li><strong>Mac:</strong> Usually <code>/usr/bin/git</code> or <code>/usr/local/bin/git</code></li>
+                </ul>
+                <div class="tip-box">If it's empty, click <strong>"Browse"</strong> and navigate to find the git file on your computer.</div>
+            </li>
+            <li>Click <strong>"OK"</strong></li>
+        </ol>
+
+        <h4>Step 2: Store Your PAT (Recommended Method)</h4>
+        <ol>
+            <li>In the RStudio <strong>Console</strong> (bottom-left panel), install the required packages:
+                <pre><code>install.packages("usethis")
+install.packages("gitcreds")</code></pre>
+                <p>Press Enter and wait for them to install (this might take a minute).</p>
+            </li>
+            <li>Now store your PAT by running:
+                <pre><code>gitcreds::gitcreds_set()</code></pre>
+            </li>
+            <li>When prompted, <strong>paste your Personal Access Token</strong> (the one you copied in Step 4) and press Enter</li>
+            <li>You should see a confirmation message that your credentials have been stored.</li>
+        </ol>
+        <div class="success-box">Your PAT is now saved! RStudio will use it automatically. ✅</div>
+
+        <h4>Step 3: Verify Everything Works</h4>
+        <p>Run this in the Console to check your setup:</p>
+        <pre><code>library(usethis)
+usethis::git_sitrep()</code></pre>
+
+        <p>This gives you a "situation report". Look for:</p>
+        <ul>
+            <li>✅ <strong>Name</strong> and <strong>Email</strong> show your information</li>
+            <li>✅ <strong>GitHub user</strong> shows your GitHub username</li>
+            <li>✅ <strong>Personal access token</strong> shows <code>&lt;discovered&gt;</code></li>
+        </ul>
+
+        <p><strong>Example of a successful setup:</strong></p>
+        <pre><code>── Git global (user)
+• Name: 'Jane Smith'
+• Email: 'jane.smith@email.com'
+── GitHub user
+• GitHub user: 'janesmith'
+• Personal access token for 'https://github.com': &lt;discovered&gt;</code></pre>
+    </div>
+
+    <h2>💻 Part 4: Connecting VS Code to GitHub</h2>
+
+    <div class="ide-box vscode">
+        <h3>🔵 VS Code Setup</h3>
+
+        <p>VS Code has excellent built-in Git support and makes connecting to GitHub very easy!</p>
+
+        <h4>Step 1: Open VS Code</h4>
+        <ol>
+            <li>Download VS Code from <a href="https://code.visualstudio.com">code.visualstudio.com</a> if you haven't already</li>
+            <li>Install and open VS Code</li>
+        </ol>
+
+        <h4>Step 2: Install the GitHub Extension (Recommended)</h4>
+        <ol>
+            <li>Click the <strong>Extensions icon</strong> in the left sidebar (it looks like 4 squares)</li>
+            <li>Search for <strong>"GitHub Pull Requests and Issues"</strong></li>
+            <li>Click <strong>"Install"</strong> on the extension published by GitHub</li>
+        </ol>
+        <div class="tip-box">This extension provides much richer GitHub integration including managing pull requests and issues directly within VS Code!</div>
+
+        <h4>Step 3: Sign In to GitHub</h4>
+        <p>VS Code makes this easy with automatic sign-in:</p>
+        <ol>
+            <li>Look at the bottom-left corner of VS Code – you should see a <strong>person icon</strong></li>
+            <li>Click on it and select <strong>"Sign in to Sync Settings"</strong> or <strong>"Turn on GitHub Pull Requests..."</strong></li>
+            <li>A browser window will open asking you to <strong>authorize VS Code</strong></li>
+            <li>Click <strong>"Authorize"</strong></li>
+            <li>You'll be redirected back to VS Code – you're now connected!</li>
+        </ol>
+
+        <div class="tip-box"><strong>Alternative method:</strong> If the automatic sign-in doesn't work, VS Code will prompt you for your GitHub username and password when you try to clone or push. Enter your username and use your <strong>PAT</strong> as the password.</div>
+
+        <h4>Step 4: Locate the Source Control Panel</h4>
+        <p>The <strong>Source Control</strong> view is where you'll do all your Git operations:</p>
+        <ol>
+            <li>Click the <strong>Source Control icon</strong> in the left sidebar (looks like a branching tree, usually 3rd from top)</li>
+            <li>This is your Git control center in VS Code!</li>
+        </ol>
+        <div class="success-box">VS Code is now connected to GitHub! 🎉</div>
+    </div>
+
+    <h2>📂 Part 5: Working with Repositories</h2>
+
+    <h3>Option A: Clone an Existing Repository (Most Common for Students)</h3>
+    <div class="step-box">
+        <p><strong>"Cloning"</strong> means downloading a copy of a repository from GitHub to your computer.</p>
+
+        <h4>First, Get the Repository URL:</h4>
+        <ol>
+            <li>Go to the GitHub repository page (your instructor will give you the link)</li>
+            <li>Click the green <strong>"Code"</strong> button</li>
+            <li>Make sure <strong>"HTTPS"</strong> is selected (not SSH)</li>
+            <li>Click the <strong>copy button</strong> (📋) to copy the URL</li>
+        </ol>
+        <p>The URL looks like: <code>https://github.com/username/repository-name.git</code></p>
+
+        <div class="ide-comparison">
+            <div class="ide-box rstudio">
+                <h4>🎨 Clone in RStudio</h4>
+                <ol>
+                    <li>Go to <strong>File → New Project</strong></li>
+                    <li>Click <strong>"Version Control"</strong></li>
+                    <li>Click <strong>"Git"</strong></li>
+                    <li>Paste the URL into <strong>"Repository URL"</strong></li>
+                    <li>Choose where to save it (e.g., Documents folder)</li>
+                    <li>Click <strong>"Create Project"</strong></li>
+                </ol>
+                <p>Look for the <strong>"Git" tab</strong> in the top-right panel – that's your Git control center!</p>
+            </div>
+
+            <div class="ide-box vscode">
+                <h4>🔵 Clone in VS Code</h4>
+                <ol>
+                    <li>Press <strong>Ctrl+Shift+P</strong> (or Cmd+Shift+P on Mac)</li>
+                    <li>Type <strong>"Git: Clone"</strong> and select it</li>
+                    <li>Paste the URL and press Enter</li>
+                    <li>Choose where to save it</li>
+                    <li>Click <strong>"Open"</strong> when prompted</li>
+                </ol>
+                <p>The <strong>Source Control</strong> panel (left sidebar) is your Git control center!</p>
+            </div>
+        </div>
+    </div>
+
+    <h3>Option B: Create a New Repository</h3>
+    <div class="step-box">
+        <h4>Step 1: Create the Repository on GitHub</h4>
+        <ol>
+            <li>Go to <a href="https://github.com">github.com</a> and log in</li>
+            <li>Click the <strong>"+"</strong> icon in the top-right corner</li>
+            <li>Select <strong>"New repository"</strong></li>
+            <li>Give it a name (e.g., <code>my-first-project</code>)</li>
+            <li>Add a description (optional but recommended)</li>
+            <li>Choose <strong>Public</strong> or <strong>Private</strong></li>
+            <li><strong>✅ Check "Add a README file"</strong> – this makes cloning easier!</li>
+            <li>Click <strong>"Create repository"</strong></li>
+        </ol>
+
+        <h4>Step 2: Clone It to Your Computer</h4>
+        <p>Follow the cloning instructions from Option A above!</p>
+    </div>
+
+    <h2>🔄 Part 6: The Daily Workflow</h2>
+
+    <div class="workflow-diagram">
+        <h3>The Git Workflow Cycle</h3>
+        <p>This is what you'll do every time you work on your project:</p>
+        <div class="workflow-steps">
+            <div class="workflow-step">1️⃣ PULL</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">2️⃣ EDIT</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">3️⃣ STAGE</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">4️⃣ COMMIT</div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step">5️⃣ PUSH</div>
+        </div>
+    </div>
+
+    <div class="step-box">
+        <h3>Understanding Each Step</h3>
+
+        <table>
+            <tr>
+                <th>Step</th>
+                <th>What It Does</th>
+                <th>When to Do It</th>
+            </tr>
+            <tr>
+                <td><strong>PULL</strong></td>
+                <td>Download the latest changes from GitHub</td>
+                <td>Always before you start working!</td>
+            </tr>
+            <tr>
+                <td><strong>EDIT</strong></td>
+                <td>Do your actual work (write code, edit files)</td>
+                <td>This is your normal work</td>
+            </tr>
+            <tr>
+                <td><strong>STAGE</strong></td>
+                <td>Select which changes you want to save</td>
+                <td>After you've made changes you want to keep</td>
+            </tr>
+            <tr>
+                <td><strong>COMMIT</strong></td>
+                <td>Save a snapshot with a description</td>
+                <td>After staging – like saving a checkpoint</td>
+            </tr>
+            <tr>
+                <td><strong>PUSH</strong></td>
+                <td>Upload your commits to GitHub</td>
+                <td>When you're ready to share/backup your work</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="ide-comparison">
+        <div class="ide-box rstudio">
+            <h4>🎨 How to Do Each Step in RStudio</h4>
+
+            <p><strong>1. PULL</strong></p>
+            <ul>
+                <li>Click the <strong>"Git" tab</strong> (top-right panel)</li>
+                <li>Click the <strong>blue down arrow ↓</strong> labeled "Pull"</li>
+            </ul>
+
+            <p><strong>2. EDIT</strong></p>
+            <ul>
+                <li>Edit your files normally</li>
+                <li>Save your files (Ctrl+S or Cmd+S)</li>
+            </ul>
+
+            <p><strong>3. STAGE</strong></p>
+            <ul>
+                <li>Go to the <strong>"Git" tab</strong></li>
+                <li>You'll see your changed files listed</li>
+                <li><strong>Check the box ☑️</strong> next to each file you want to include</li>
+            </ul>
+
+            <p><strong>4. COMMIT</strong></p>
+            <ul>
+                <li>Click the <strong>"Commit"</strong> button</li>
+                <li>Type a message describing what you changed</li>
+                <li>Click <strong>"Commit"</strong></li>
+            </ul>
+
+            <p><strong>5. PUSH</strong></p>
+            <ul>
+                <li>Click the <strong>green up arrow ↑</strong> labeled "Push"</li>
+            </ul>
+        </div>
+
+        <div class="ide-box vscode">
+            <h4>🔵 How to Do Each Step in VS Code</h4>
+
+            <p><strong>1. PULL</strong></p>
+            <ul>
+                <li>Click the <strong>Source Control icon</strong> (left sidebar)</li>
+                <li>Click the <strong>three dots ⋯</strong> menu → <strong>"Pull"</strong></li>
+                <li>Or use the keyboard: Press <strong>Ctrl+Shift+P</strong> → type "Git: Pull"</li>
+            </ul>
+
+            <p><strong>2. EDIT</strong></p>
+            <ul>
+                <li>Edit your files normally</li>
+                <li>Save your files (Ctrl+S or Cmd+S)</li>
+            </ul>
+
+            <p><strong>3. STAGE</strong></p>
+            <ul>
+                <li>Go to <strong>Source Control</strong> panel</li>
+                <li>You'll see changed files under "Changes"</li>
+                <li>Click the <strong>+ icon</strong> next to each file to stage it</li>
+                <li>Or click the <strong>+ icon</strong> next to "Changes" to stage all</li>
+            </ul>
+
+            <p><strong>4. COMMIT</strong></p>
+            <ul>
+                <li>Type your message in the <strong>text box</strong> at the top</li>
+                <li>Click the <strong>✓ checkmark</strong> or press Ctrl+Enter</li>
+            </ul>
+
+            <p><strong>5. PUSH</strong></p>
+            <ul>
+                <li>Click the <strong>three dots ⋯</strong> → <strong>"Push"</strong></li>
+                <li>Or click <strong>"Sync Changes"</strong> button</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="tip-box">
+        <h4>💡 Writing Good Commit Messages</h4>
+        <p>Your commit message should briefly describe what you changed:</p>
+        <ul>
+            <li>✅ "Added analysis for Question 3"</li>
+            <li>✅ "Fixed bug in data cleaning script"</li>
+            <li>✅ "Updated introduction section"</li>
+            <li>❌ "stuff" (too vague!)</li>
+            <li>❌ "asdfasdf" (meaningless!)</li>
+            <li>❌ "changes" (what changes?)</li>
+        </ul>
+    </div>
+
+    <h2>📋 Quick Reference Card</h2>
+
+    <table>
+        <tr>
+            <th>Action</th>
+            <th>What It Does</th>
+            <th>RStudio</th>
+            <th>VS Code</th>
+        </tr>
+        <tr>
+            <td><strong>Clone</strong></td>
+            <td>Download a repo</td>
+            <td>File → New Project → Version Control</td>
+            <td>Ctrl+Shift+P → "Git: Clone"</td>
+        </tr>
+        <tr>
+            <td><strong>Pull</strong></td>
+            <td>Get latest changes</td>
+            <td>Git tab → Blue arrow ↓</td>
+            <td>Source Control → ⋯ → Pull</td>
+        </tr>
+        <tr>
+            <td><strong>Stage</strong></td>
+            <td>Select files</td>
+            <td>Git tab → Check boxes ☑️</td>
+            <td>Source Control → Click + icon</td>
+        </tr>
+        <tr>
+            <td><strong>Commit</strong></td>
+            <td>Save snapshot</td>
+            <td>Commit button → Type message</td>
+            <td>Type message → Click ✓</td>
+        </tr>
+        <tr>
+            <td><strong>Push</strong></td>
+            <td>Upload to GitHub</td>
+            <td>Git tab → Green arrow ↑</td>
+            <td>⋯ → Push (or Sync Changes)</td>
+        </tr>
+    </table>
+
+    <h2>🔧 Part 7: Troubleshooting Common Issues</h2>
+
+    <div class="troubleshooting">
+        <div class="troubleshooting-header">❌ "Git executable not found"</div>
+        <div class="troubleshooting-content">
+            <p><strong>Problem:</strong> Git may not be installed, or your IDE can't find it.</p>
+            <p><strong>Solution:</strong></p>
+            <ol>
+                <li>Reinstall Git from <a href="https://git-scm.com">git-scm.com</a></li>
+                <li>Restart your computer</li>
+                <li>In RStudio: Tools → Global Options → Git/SVN → Browse to find git</li>
+                <li>In VS Code: It usually finds Git automatically after restart</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="troubleshooting">
+        <div class="troubleshooting-header">❌ "Authentication failed" or "Invalid credentials"</div>
+        <div class="troubleshooting-content">
+            <p><strong>Problem:</strong> Your PAT is missing, expired, or incorrect.</p>
+            <p><strong>Solution:</strong></p>
+            <ol>
+                <li>Generate a new PAT on GitHub (follow Step 4 again)</li>
+                <li><strong>In RStudio:</strong> Run <code>gitcreds::gitcreds_set()</code> and paste the new token</li>
+                <li><strong>In VS Code:</strong> When prompted, enter your username and use the PAT as password</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="troubleshooting">
+        <div class="troubleshooting-header">❌ "Repository not found" when cloning</div>
+        <div class="troubleshooting-content">
+            <p><strong>Problem:</strong> The URL is wrong, or you don't have access.</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Check that the URL is correct (copy it again from GitHub)</li>
+                <li>Make sure you have access to the repository (it might be private)</li>
+                <li>Verify you're logged into the correct GitHub account</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="troubleshooting">
+        <div class="troubleshooting-header">❌ "Updates were rejected" when pushing</div>
+        <div class="troubleshooting-content">
+            <p><strong>Problem:</strong> Someone else made changes, or you made changes on another computer.</p>
+            <p><strong>Solution:</strong></p>
+            <ol>
+                <li>Click <strong>Pull</strong> first to get the latest changes</li>
+                <li>Then try <strong>Push</strong> again</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="troubleshooting">
+        <div class="troubleshooting-header">❌ Can't see the Git tab/panel</div>
+        <div class="troubleshooting-content">
+            <p><strong>Problem:</strong> Your project isn't linked to Git.</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li><strong>RStudio:</strong> Make sure you opened an RStudio <em>Project</em>, not just a file. The project must be cloned from GitHub.</li>
+                <li><strong>VS Code:</strong> Make sure you opened a folder that contains a Git repository (has a hidden <code>.git</code> folder).</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>📚 Getting More Help</h2>
+
+    <div class="step-box">
+        <h3>Helpful Resources</h3>
+        <ul>
+            <li><strong>GitHub Documentation:</strong> <a href="https://docs.github.com">docs.github.com</a></li>
+            <li><strong>Happy Git with R</strong> (excellent resource for R users): <a href="https://happygitwithr.com">happygitwithr.com</a></li>
+            <li><strong>VS Code Git Documentation:</strong> <a href="https://code.visualstudio.com/docs/sourcecontrol/overview">code.visualstudio.com/docs/sourcecontrol</a></li>
+            <li><strong>Git Cheat Sheet:</strong> <a href="https://education.github.com/git-cheat-sheet-education.pdf">education.github.com/git-cheat-sheet</a></li>
+        </ul>
+
+        <div class="tip-box">
+            <strong>Don't forget:</strong> Ask your instructor or TA if you get stuck! That's what they're there for. 😊
+        </div>
+    </div>
+
+    <div class="footer">
+        <h3>🎉 You're Ready!</h3>
+        <p>You now have all the tools you need to start using Git and GitHub with both RStudio and VS Code.</p>
+        <p>Remember: Practice makes perfect. The more you use these tools, the more natural they'll become!</p>
+        <p><strong>Last updated:</strong> January 2026</p>
+    </div>
+</body>
+</html>
